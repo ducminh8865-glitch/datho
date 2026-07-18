@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SayCar Đặt Hộ — Xem thử trên điện thoại</title>
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  html, body { height: 100%; }
+  .stage {
+    min-height: 100vh; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px; padding: 30px 16px 40px;
+    background: radial-gradient(1100px 600px at 50% -10%, rgba(14,165,164,.20), transparent 60%), linear-gradient(160deg, #e7eef0, #cfe2e0);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .device {
+    position: relative; height: min(88vh, 780px); height: min(88svh, 780px);
+    aspect-ratio: 9 / 19.5; width: auto; max-width: 94vw;
+    background: #0b1220; border-radius: 48px; padding: 12px;
+    box-shadow: 0 40px 90px rgba(2,10,20,.45), 0 0 0 2px rgba(255,255,255,.05) inset;
+    display: flex; flex-direction: column;
+  }
+  .device::before, .device::after { content:""; position:absolute; width:3px; background:#0a0f18; }
+  .device::before { left:-3px; top:20%; height:13%; border-radius:3px 0 0 3px; }
+  .device::after  { right:-3px; top:27%; height:9%; border-radius:0 3px 3px 0; }
+  .screen { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; border-radius: 36px; overflow: hidden;
+    background: linear-gradient(180deg, #0ea5a4 0%, #0f766e 220px, #f1f5f9 220px, #f1f5f9 100%);
+    display: flex; flex-direction: column; }
+  .island { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 112px; height: 30px; background: #05070c; border-radius: 18px; z-index: 60; }
+  .statusbar { flex: 0 0 auto; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 6px 24px 0; background: #0ea5a4; color: #fff; font-size: 14px; font-weight: 600; }
+  .sb-icons { display:flex; align-items:center; gap:7px; }
+  .sb-bars { display:flex; align-items:flex-end; gap:2px; height:11px; }
+  .sb-bars i { width:3px; background:#fff; border-radius:1px; }
+  .sb-bars i:nth-child(1){height:4px}.sb-bars i:nth-child(2){height:6px}.sb-bars i:nth-child(3){height:8px}.sb-bars i:nth-child(4){height:11px}
+  .sb-batt { width:22px; height:11px; border:1.5px solid #fff; border-radius:3px; position:relative; }
+  .sb-batt::before { content:""; position:absolute; inset:1.5px; width:70%; background:#fff; border-radius:1px; }
+  .sb-batt::after { content:""; position:absolute; right:-3px; top:3px; width:2px; height:5px; background:#fff; border-radius:0 1px 1px 0; }
+  .app-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  .app-scroll::-webkit-scrollbar { width: 0; }
+  .caption { text-align:center; color:#0f2a2b; max-width: 440px; }
+  .caption .t { font-weight: 800; font-size: 16px; }
+  .caption .s { color:#4f6b6c; font-size: 13px; margin-top: 5px; line-height:1.5; }
+  .demo-badge { display:inline-block; margin-bottom:10px; padding:5px 12px; border-radius:999px; background: rgba(14,165,164,.16); color:#0b7f7e; font-size:12px; font-weight:700; }
+  .toast { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); background: #0f221e; color:#fff; padding: 10px 16px; border-radius: 12px; font-size: 13px; max-width: 82%; text-align:center; z-index: 90; box-shadow: 0 12px 30px rgba(0,0,0,.35); opacity: 0; transition: opacity .25s, transform .25s; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="device">
+    <div class="island"></div>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span class="sb-icons"><span class="sb-bars"><i></i><i></i><i></i><i></i></span><span class="sb-batt"></span></span></div>
+      <div class="app-scroll">
+        <div class="wrap">
+          <div class="brand"><h1>SayCar · Đặt Hộ</h1><p>Đặt chuyến hộ khách — kết nối thẳng hệ thống</p></div>
+
+          <div id="view-login" class="card">
+            <h2>Đăng nhập</h2>
+            <label>Số điện thoại</label><input id="login-phone" type="tel" placeholder="09xxxxxxxx" />
+            <label>Mật khẩu</label><input id="login-pass" type="password" placeholder="Mật khẩu" />
+            <div id="login-msg" class="msg"></div>
+            <button class="btn" onclick="doLogin()">Đăng nhập</button>
+            <div class="center" style="margin-top:14px"><button class="btn link" onclick="show('register')">Chưa có tài khoản? Đăng ký</button></div>
+          </div>
+
+          <div id="view-register" class="card hidden">
+            <h2>Đăng ký</h2>
+            <label>Số điện thoại</label><input id="reg-phone" type="tel" placeholder="09xxxxxxxx" />
+            <label>Mật khẩu (tối thiểu 6 ký tự)</label><input id="reg-pass" type="password" placeholder="Mật khẩu" />
+            <label>Xác nhận mật khẩu</label><input id="reg-pass2" type="password" placeholder="Nhập lại mật khẩu" />
+            <div id="reg-msg" class="msg"></div>
+            <button class="btn" onclick="doRegister()">Đăng ký</button>
+            <div class="center" style="margin-top:14px"><button class="btn link" onclick="show('login')">Đã có tài khoản? Đăng nhập</button></div>
+          </div>
+
+          <div id="view-app" class="hidden">
+            <div class="topbar">
+              <span class="u">Xin chào, <b id="me-name"></b></span>
+              <button class="btn link" style="color:#fff" onclick="logout()">Đăng xuất</button>
+            </div>
+            <div class="card earn-card">
+              <div class="earn-label">Thu nhập của bạn (đã chốt)</div>
+              <div class="earn-total" id="earn-total">—</div>
+              <div class="earn-sub" id="earn-sub"></div>
+            </div>
+            <div id="noti-banner" class="card" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+              <span class="muted" style="font-size:13px">🔔 Bật thông báo để nhận cập nhật chuyến kể cả khi không mở app.</span>
+              <button class="btn sm" onclick="demoNoti()">Bật</button>
+            </div>
+            <div class="card">
+              <h2>Tạo chuyến mới</h2>
+              <label><span class="dot from"></span>Điểm đón *</label>
+              <div class="ac"><input id="b-pickup" type="text" autocomplete="off" placeholder="Gõ địa chỉ đón rồi chọn gợi ý" /><div id="ac-pickup" class="ac-list hidden"></div></div>
+              <label><span class="dot to"></span>Điểm đến *</label>
+              <div class="ac"><input id="b-dropoff" type="text" autocomplete="off" placeholder="Gõ địa chỉ đến rồi chọn gợi ý" /><div id="ac-dropoff" class="ac-list hidden"></div></div>
+              <div class="row">
+                <div><label>Loại xe</label><select id="b-vehicle"></select></div>
+                <div><label>Thanh toán</label><select id="b-payment"></select></div>
+              </div>
+              <label>Tên khách hàng</label><input id="b-cname" type="text" placeholder="Tên khách" />
+              <label>Số điện thoại khách *</label><input id="b-cphone" type="tel" placeholder="09xxxxxxxx" />
+              <button class="btn secondary" id="b-preview" onclick="doPreview()">Tính giá</button>
+              <div id="b-price" class="price-box hidden"></div>
+              <div id="b-msg" class="msg"></div>
+              <button class="btn hidden" id="b-submit" onclick="doBooking()">Xác nhận đặt chuyến</button>
+            </div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Chuyến tôi đã đặt</h2><button class="btn link" onclick="loadHistory()">↻ Làm mới</button></div>
+              <div id="history" style="margin-top:12px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="toast" class="toast"></div>
+    </div>
+  </div>
+
+  <div class="caption">
+    <span class="demo-badge">BẢN XEM THỬ · DỮ LIỆU GIẢ LẬP</span>
+    <div class="t">SayCar · Đặt Hộ</div>
+    <div class="s">Bấm thử: <b>Đăng ký</b> → <b>Tạo chuyến</b> (gõ địa chỉ, chọn gợi ý, Tính giá) → xem trạng thái và hoa hồng ở "Chuyến tôi đã đặt".</div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const vnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) || 0)) + ' đ';
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const sel = { pickup:{placeId:'',text:''}, dropoff:{placeId:'',text:''} };
+  let lastPreview = null, idc = 100; const RATE = 0.15;
+
+  function show(view){ ['login','register','app'].forEach((v)=>$('view-'+v).classList.toggle('hidden', v!==view)); }
+  function msg(el,t,type){ const m=$(el); m.textContent=t; m.className='msg show '+(type||'err'); }
+  function clearMsg(el){ $(el).className='msg'; }
+  function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600); }
+
+  const drivers=[{n:'Hoàng Huy Tùng'},{n:'Vũ Minh Thắng'},{n:'Đỗ Tiến Minh'},{n:'Nguyễn Văn Đăng'}];
+  function mk(pickup,dropoff,cname,cphone,total,st,drv){ return { tripStatus:st, shortCode:String(10000000+Math.floor(Math.random()*8.9e7)), payload:{pickup,dropoff,customerName:cname,customerPhone:cphone,total,driverName:drv?drv.n:''} }; }
+  const HISTORY=[
+    mk('32 Cầu Giấy, Láng, Hà Nội','62 Vũ Trọng Phụng, Thanh Xuân, Hà Nội','Anh Minh','0912 345 678',257716,'accepted',drivers[0]),
+    mk('Times City, Hai Bà Trưng, Hà Nội','Hồ Gươm, Hoàn Kiếm, Hà Nội','Chị Lan','0977 111 222',168000,'in-progress',drivers[1]),
+    mk('Kim Mã, Ba Đình, Hà Nội','Sân bay Nội Bài','Anh Dũng','0968 456 789',350000,'completed',drivers[2]),
+    mk('Trần Duy Hưng, Cầu Giấy, Hà Nội','Vincom Bà Triệu, Hà Nội','Chị Hà','0905 678 123',94000,'canceled',null),
+  ];
+  const LABEL={pending:'Đang tìm tài xế',accepted:'Tài xế đã nhận','in-progress':'Đã đón khách / đang chạy',completed:'Hoàn thành',canceled:'Đã huỷ'};
+  function mockPred(q){ q=(q||'').trim(); const base=['Cầu Giấy, Láng, Hà Nội','Vũ Trọng Phụng, Thanh Xuân, Hà Nội','Kim Mã, Ba Đình, Hà Nội','Trần Duy Hưng, Cầu Giấy, Hà Nội','Times City, Hai Bà Trưng, Hà Nội']; return base.map((b,i)=>({description:(q?q+' - ':'')+b, place_id:'d'+i, main:(q||b.split(',')[0]), secondary:b})); }
+
+  function doRegister(){ clearMsg('reg-msg'); const p=$('reg-pass').value; if(!$('reg-phone').value.trim()||!p) return msg('reg-msg','Nhập số điện thoại và mật khẩu'); if(p.length<6) return msg('reg-msg','Mật khẩu tối thiểu 6 ký tự'); if(p!==$('reg-pass2').value) return msg('reg-msg','Mật khẩu xác nhận không khớp'); enterApp(); }
+  function doLogin(){ clearMsg('login-msg'); if(!$('login-phone').value.trim()||!$('login-pass').value) return msg('login-msg','Nhập số điện thoại và mật khẩu'); enterApp(); }
+  function logout(){ show('login'); document.querySelector('.app-scroll').scrollTo({top:0}); }
+  function demoNoti(){ $('noti-banner').classList.add('hidden'); toast('✓ (Xem thử) Thông báo sẽ bật khi chạy trên máy chủ'); }
+
+  function enterApp(){
+    $('me-name').textContent='Bạn'; show('app');
+    $('b-vehicle').innerHTML='<option value="CAR">Ô tô</option><option value="BIKE">Xe máy</option>';
+    $('b-payment').innerHTML='<option value="TRANSFER">Chuyển khoản</option><option value="CASH">Tiền mặt</option>';
+    setupAC('b-pickup','ac-pickup','pickup'); setupAC('b-dropoff','ac-dropoff','dropoff');
+    $('b-vehicle').addEventListener('change', invalidatePrice);
+    loadHistory(); loadEarnings();
+  }
+
+  function setupAC(inputId,listId,key){
+    const input=$(inputId), list=$(listId); let timer=null, seq=0;
+    input.addEventListener('input',()=>{ sel[key]={placeId:'',text:''}; invalidatePrice(); const q=input.value.trim(); clearTimeout(timer); if(q.length<2){list.classList.add('hidden');return;}
+      timer=setTimeout(async()=>{ const my=++seq; let preds=[];
+        try { const r=await fetch('/api/demo/autocomplete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input:q})}); preds=(await r.json()).predictions||[]; } catch{}
+        if(my!==seq) return;
+        list.innerHTML=preds.length?preds.map((p)=>`<div class="ac-item"><div class="main">${esc(p.main||p.description)}</div><div class="sec">${esc(p.secondary||'')}</div></div>`).join(''):'<div class="ac-empty">Không có gợi ý</div>';
+        list.querySelectorAll('.ac-item').forEach((el,i)=>el.addEventListener('mousedown',(e)=>{ e.preventDefault(); sel[key]={placeId:preds[i].place_id,text:preds[i].description}; input.value=preds[i].description; list.classList.add('hidden'); invalidatePrice(); }));
+        list.classList.remove('hidden'); },300);
+    });
+    input.addEventListener('blur',()=>setTimeout(()=>list.classList.add('hidden'),200));
+  }
+  function invalidatePrice(){ $('b-price').classList.add('hidden'); $('b-submit').classList.add('hidden'); clearMsg('b-msg'); }
+
+  async function doPreview(){ clearMsg('b-msg'); if(!sel.pickup.placeId||!sel.dropoff.placeId) return msg('b-msg','Hãy chọn điểm đón và điểm đến từ gợi ý');
+    const btn=$('b-preview'); btn.disabled=true; btn.textContent='Đang tính...';
+    let d=null; try { const r=await fetch('/api/demo/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fromPlaceId:sel.pickup.placeId,toPlaceId:sel.dropoff.placeId,vehicle:$('b-vehicle').value})}); d=await r.json(); } catch{}
+    btn.disabled=false; btn.textContent='Tính lại giá';
+    if(!d||!d.ok) return msg('b-msg',(d&&d.error)||'Không tính được giá','err');
+    lastPreview={total:d.total};
+    $('b-price').innerHTML=`<div class="route">${esc(d.from)} → ${esc(d.to)}</div><div class="total">${vnd(d.total)}</div><div class="brk">Quãng đường ${(d.distance/1000).toFixed(1)} km · ~${Math.round(d.duration/60)} phút · đã gồm VAT + phí</div>`;
+    $('b-price').classList.remove('hidden'); $('b-submit').classList.remove('hidden');
+  }
+
+  async function doBooking(){ clearMsg('b-msg'); if(!$('b-cphone').value.trim()) return msg('b-msg','Nhập số điện thoại khách');
+    const btn=$('b-submit'); btn.disabled=true; btn.textContent='Đang đặt...'; await sleep(500); btn.disabled=false; btn.textContent='Xác nhận đặt chuyến';
+    const total=(lastPreview&&lastPreview.total)||150000; const it=mk(sel.pickup.text,sel.dropoff.text,$('b-cname').value.trim()||'Khách',$('b-cphone').value.trim(),total,'pending',null); HISTORY.unshift(it);
+    setTimeout(()=>{ it.tripStatus='accepted'; const d=drivers[Math.floor(Math.random()*4)]; it.payload.driverName=d.n; if(!$('view-app').classList.contains('hidden')){loadHistory();loadEarnings();} toast('🔔 Tài xế '+d.n+' đã nhận chuyến'); },3500);
+    msg('b-msg','Đặt chuyến thành công! · '+vnd(total)+' · Mã '+it.shortCode,'ok');
+    ['b-pickup','b-dropoff','b-cname','b-cphone'].forEach((i)=>$(i).value=''); sel.pickup={placeId:'',text:''}; sel.dropoff={placeId:'',text:''}; invalidatePrice(); loadHistory(); loadEarnings();
+  }
+
+  function tripPill(b){ const t=(b.tripStatus||'').toLowerCase(); let cls='pending'; if(t==='completed')cls='success'; else if(['canceled','cancelled','rejected'].includes(t))cls='failed'; return {cls,label:LABEL[t]||'Đã gửi'}; }
+
+  function loadEarnings(){
+    let eg=0,cc=0,ag=0,ac=0; HISTORY.forEach((b)=>{ const t=(b.tripStatus||'').toLowerCase(); const a=(b.payload&&b.payload.total)||0; if(t==='completed'){cc++;eg+=a;} else if(!['canceled','cancelled','rejected'].includes(t)){ac++;ag+=a;} });
+    $('earn-total').textContent=vnd(Math.round(eg*RATE));
+    const parts=[`${cc} chuyến hoàn thành`]; if(ac) parts.push(`đang chạy ${ac} · dự kiến +${vnd(Math.round(ag*RATE))}`); parts.push('hoa hồng 15%');
+    $('earn-sub').textContent=parts.join(' · ');
+  }
+
+  function loadHistory(){
+    const box=$('history');
+    if(!HISTORY.length){ box.innerHTML='<p class="muted">Chưa có chuyến nào.</p>'; return; }
+    box.innerHTML=HISTORY.map((b)=>{ const p=b.payload||{}; const pill=tripPill(b); const t=(b.tripStatus||'').toLowerCase();
+      const meta=[p.total?vnd(p.total):'', b.shortCode?'#'+esc(b.shortCode):''].filter(Boolean).join(' · ');
+      const drv=p.driverName?`<div class="sub">Tài xế: <b>${esc(p.driverName)}</b></div>`:'';
+      const comm=['canceled','cancelled','rejected'].includes(t)?'':(t==='completed'?`<div class="comm earned">Hoa hồng: +${vnd(Math.round((p.total||0)*RATE))}</div>`:`<div class="comm">Hoa hồng (dự kiến): +${vnd(Math.round((p.total||0)*RATE))}</div>`);
+      return `<div class="hist-item"><div class="top"><span class="pill ${pill.cls}">${esc(pill.label)}</span><span class="meta">${meta}</span></div>
+        <div class="leg from"><span class="pin"></span><span class="txt">${esc(p.pickup)}</span></div>
+        <div class="leg to"><span class="pin"></span><span class="txt">${esc(p.dropoff)}</span></div>
+        <div class="sub">Khách: <b>${esc(p.customerName||'-')}</b>${p.customerPhone?' · '+esc(p.customerPhone):''}</div>${drv}${comm}</div>`;
+    }).join('');
+  }
+
+  show('login');
+  const h=location.hash.replace('#','');
+  if(h==='app'||h==='hist'){ enterApp(); if(h==='hist') setTimeout(()=>document.querySelector('.app-scroll').scrollTo(0,99999),300); }
+</script>
+</body>
+</html>
