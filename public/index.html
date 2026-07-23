@@ -34,6 +34,8 @@
       <input id="reg-pass" type="password" placeholder="Mật khẩu" autocomplete="new-password" />
       <label>Xác nhận mật khẩu</label>
       <input id="reg-pass2" type="password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" />
+      <label>Mã mời (nếu được yêu cầu)</label>
+      <input id="reg-code" type="text" placeholder="Mã mời do quản trị cấp" autocomplete="off" />
       <div id="reg-msg" class="msg"></div>
       <button class="btn" onclick="doRegister()">Đăng ký</button>
       <div class="center" style="margin-top:14px"><button class="btn link" onclick="show('login')">Đã có tài khoản? Đăng nhập</button></div>
@@ -50,9 +52,49 @@
       </div>
 
       <div class="card earn-card">
-        <div class="earn-label">Thu nhập của bạn (đã chốt)</div>
+        <div class="earn-label">Số dư của bạn</div>
         <div class="earn-total" id="earn-total">—</div>
         <div class="earn-sub" id="earn-sub"></div>
+        <button class="btn sm earn-btn" onclick="toggleWithdraw()">💸 Rút tiền</button>
+      </div>
+
+      <!-- RÚT TIỀN -->
+      <div class="card hidden" id="withdraw-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2 style="margin:0">Rút tiền</h2>
+          <button class="btn link" onclick="toggleWithdraw()">Đóng</button>
+        </div>
+        <p class="muted" style="margin:10px 0 0">Có thể rút: <b id="wd-available" style="color:#166534">—</b></p>
+
+        <!-- Thông tin nhận tiền đã lưu -->
+        <div id="wd-bank-view" class="bank-box hidden">
+          <div>
+            <div class="bank-line" id="wd-bank-summary"></div>
+            <div class="muted" id="wd-bank-owner"></div>
+          </div>
+          <button class="btn link" onclick="editBank()">Sửa</button>
+        </div>
+
+        <!-- Form nhập / sửa thông tin nhận tiền -->
+        <div id="wd-bank-form">
+          <label>Ngân hàng</label>
+          <input id="wd-bank-name" type="text" placeholder="VD: Vietcombank, MB Bank..." />
+          <label>Số tài khoản</label>
+          <input id="wd-acc-num" type="text" inputmode="numeric" placeholder="Số tài khoản nhận tiền" />
+          <label>Tên chủ tài khoản</label>
+          <input id="wd-acc-name" type="text" placeholder="VD: NGUYEN VAN A" />
+          <button class="btn secondary" id="wd-bank-save" onclick="saveBank()">Lưu thông tin nhận tiền</button>
+        </div>
+
+        <!-- Nhập số tiền muốn rút -->
+        <div id="wd-request" class="hidden">
+          <label>Số tiền muốn rút (đ) · <button class="btn link" style="padding:0;font-size:12px" onclick="setMaxWithdraw()">Rút tối đa</button></label>
+          <input id="wd-amount" type="number" inputmode="numeric" min="1000" step="1000" placeholder="VD: 200000" />
+          <button class="btn" id="wd-submit" onclick="requestWithdraw()">Gửi yêu cầu rút tiền</button>
+        </div>
+
+        <div id="wd-msg" class="msg"></div>
+        <div id="wd-history"></div>
       </div>
 
       <div id="noti-banner" class="card hidden" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px">

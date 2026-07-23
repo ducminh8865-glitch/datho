@@ -163,6 +163,57 @@ async function findCustomer(phone) {
   return { userUUID: c.id, name: c.firstName || '', phone: c.phone };
 }
 
+// --- Tra TÀI XẾ theo SĐT (dùng để miễn mã mời khi đăng ký) ---
+// Trả về { name, phone, verified } hoặc null nếu không thấy.
+function isDriverVerified(d) {
+  // Tên trường xác thực của saycar có thể khác nhau -> kiểm tra các khả năng phổ biến
+  const truthy = (v) =>
+    v === true || v === 1 ||
+    ['1', 'true', 'yes', 'verified', 'approved', 'active'].includes(String(v || '').toLowerCase());
+  if (truthy(d.verified) || truthy(d.isVerified) || truthy(d.verify) ||
+      truthy(d.statusVerify) || truthy(d.verifyStatus) || truthy(d.identityVerified)) return true;
+  const st = String(d.status || d.statusDriver || d.statusAccount || '').toLowerCase().replace(/_/g, '-');
+  return ['active', 'verified', 'approved'].includes(st);
+}
+
+async function findDriver(phone) {
+  // Mock: SĐT kết thúc bằng "99" coi như tài xế đã xác thực (để thử nghiệm)
+  if (config.saycar.mock) {
+    return String(phone).endsWith('99')
+      ? { name: '(mock) Tài xế', phone, verified: true }
+      : null;
+  }
+
+  // Thử các định dạng số hay gặp: 09xxxxxxxx / +849xxxxxxxx / 849xxxxxxxx
+  const variants = [String(phone)];
+  if (/^0\d{9}$/.test(phone)) variants.push('+84' + phone.slice(1), '84' + phone.slice(1));
+  else if (/^\+84\d{9}$/.test(phone)) variants.push('0' + phone.slice(3), phone.slice(1));
+  else if (/^84\d{9}$/.test(phone)) variants.push('0' + phone.slice(2), '+' + phone);
+
+  for (const p of variants) {
+    const data = await authedFetch('/api/admin/manage/DRIVER?phone=' + encodeURIComponent(p), { method: 'GET' });
+    const list = (data && data.data) || [];
+    const d = list.find((x) => x && x.phone) || list[0];
+    if (d) {
+      const verified = isDriverVerified(d);
+      if (!verified) {
+        // Ghi log các trường trạng thái để dễ chỉnh nếu saycar đặt tên khác
+        console.log('findDriver: thấy tài xế nhưng chưa nhận là "đã xác thực". Các trường:',
+          Object.keys(d).filter((k) => /status|verif|active/i.test(k)).map((k) => k + '=' + d[k]).join(', ') || '(không có trường trạng thái)');
+      }
+      return { name: d.firstName || d.name || '', phone: d.phone, verified };
+    }
+  }
+  return null;
+}
+
+// --- Danh sách tài xế theo trang (dùng cho đồng bộ về DB local) ---
+async function listDrivers({ page = 1, size = 100 } = {}) {
+  if (config.saycar.mock) return [];
+  const data = await authedFetch(`/api/admin/manage/DRIVER?page=${page}&size=${size}`, { method: 'GET' });
+  return (data && data.data) || [];
+}
+
 // --- Tạo chuyến ---
 async function createBooking({ fromPlaceId, toPlaceId, vehicle = 'CAR', customerName, customerPhone, paymentMethod = 'TRANSFER' }) {
   if (config.saycar.mock) {
@@ -238,6 +289,9 @@ module.exports = {
   placeDetail,
   preview,
   findCustomer,
+  findDriver,
+  listDrivers,
+  isDriverVerified,
   createBooking,
   listBookings,
   resolveShortCode,

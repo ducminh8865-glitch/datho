@@ -80,9 +80,31 @@
               <button class="btn link" style="color:#fff" onclick="logout()">Đăng xuất</button>
             </div>
             <div class="card earn-card">
-              <div class="earn-label">Thu nhập của bạn (đã chốt)</div>
+              <div class="earn-label">Số dư của bạn</div>
               <div class="earn-total" id="earn-total">—</div>
               <div class="earn-sub" id="earn-sub"></div>
+              <button class="btn sm earn-btn" onclick="toggleWithdraw()">💸 Rút tiền</button>
+            </div>
+            <div class="card hidden" id="withdraw-card">
+              <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Rút tiền</h2><button class="btn link" onclick="toggleWithdraw()">Đóng</button></div>
+              <p class="muted" style="margin:10px 0 0">Có thể rút: <b id="wd-available" style="color:#166534">—</b></p>
+              <div id="wd-bank-view" class="bank-box hidden">
+                <div><div class="bank-line" id="wd-bank-summary"></div><div class="muted" id="wd-bank-owner"></div></div>
+                <button class="btn link" onclick="editBank()">Sửa</button>
+              </div>
+              <div id="wd-bank-form">
+                <label>Ngân hàng</label><input id="wd-bank-name" type="text" placeholder="VD: Vietcombank, MB Bank..." />
+                <label>Số tài khoản</label><input id="wd-acc-num" type="text" inputmode="numeric" placeholder="Số tài khoản nhận tiền" />
+                <label>Tên chủ tài khoản</label><input id="wd-acc-name" type="text" placeholder="VD: NGUYEN VAN A" />
+                <button class="btn secondary" onclick="saveBank()">Lưu thông tin nhận tiền</button>
+              </div>
+              <div id="wd-request" class="hidden">
+                <label>Số tiền muốn rút (đ) · <button class="btn link" style="padding:0;font-size:12px" onclick="setMaxWithdraw()">Rút tối đa</button></label>
+                <input id="wd-amount" type="number" inputmode="numeric" placeholder="VD: 50000" />
+                <button class="btn" onclick="requestWithdraw()">Gửi yêu cầu rút tiền</button>
+              </div>
+              <div id="wd-msg" class="msg"></div>
+              <div id="wd-history"></div>
             </div>
             <div id="noti-banner" class="card" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px">
               <span class="muted" style="font-size:13px">🔔 Bật thông báo để nhận cập nhật chuyến kể cả khi không mở app.</span>
@@ -119,7 +141,7 @@
   <div class="caption">
     <span class="demo-badge">BẢN XEM THỬ · DỮ LIỆU GIẢ LẬP</span>
     <div class="t">SayCar · Đặt Hộ</div>
-    <div class="s">Bấm thử: <b>Đăng ký</b> → <b>Tạo chuyến</b> (gõ địa chỉ, chọn gợi ý, Tính giá) → xem trạng thái và hoa hồng ở "Chuyến tôi đã đặt".</div>
+    <div class="s">Bấm thử: <b>Đăng ký</b> → <b>Tạo chuyến</b> (gõ địa chỉ, chọn gợi ý, Tính giá) → xem hoa hồng ở "Chuyến tôi đã đặt" → bấm <b>💸 Rút tiền</b> để thử rút về tài khoản ngân hàng.</div>
   </div>
 </div>
 
@@ -197,9 +219,33 @@
 
   function loadEarnings(){
     let eg=0,cc=0,ag=0,ac=0; HISTORY.forEach((b)=>{ const t=(b.tripStatus||'').toLowerCase(); const a=(b.payload&&b.payload.total)||0; if(t==='completed'){cc++;eg+=a;} else if(!['canceled','cancelled','rejected'].includes(t)){ac++;ag+=a;} });
-    $('earn-total').textContent=vnd(Math.round(eg*RATE));
-    const parts=[`${cc} chuyến hoàn thành`]; if(ac) parts.push(`đang chạy ${ac} · dự kiến +${vnd(Math.round(ag*RATE))}`); parts.push('hoa hồng 15%');
+    const {paid,pend}=wdSums();
+    $('earn-total').textContent=vnd(Math.round(eg*RATE)-paid);
+    const parts=[`${cc} chuyến hoàn thành`]; if(paid) parts.push(`đã rút ${vnd(paid)}`); if(pend) parts.push(`chờ duyệt rút ${vnd(pend)}`); if(ac) parts.push(`đang chạy ${ac} · dự kiến +${vnd(Math.round(ag*RATE))}`); parts.push('hoa hồng 15%');
     $('earn-sub').textContent=parts.join(' · ');
+  }
+
+  // ===== Rút tiền (giả lập: "admin" tự bấm Đã CK sau vài giây) =====
+  let BANK=null; const WDS=[];
+  const WD_LABEL={pending:{cls:'pending',label:'Chờ duyệt'},paid:{cls:'success',label:'Đã chuyển khoản'}};
+  function wdSums(){ let paid=0,pend=0; WDS.forEach((w)=>{ if(w.status==='paid')paid+=w.amount; else pend+=w.amount; }); return {paid,pend}; }
+  function earnedNow(){ let eg=0; HISTORY.forEach((b)=>{ if((b.tripStatus||'').toLowerCase()==='completed') eg+=(b.payload&&b.payload.total)||0; }); return Math.round(eg*RATE); }
+  function wdAvail(){ const {paid,pend}=wdSums(); return Math.max(0,earnedNow()-paid-pend); }
+  function toggleWithdraw(){ const c=$('withdraw-card'); const open=c.classList.contains('hidden'); c.classList.toggle('hidden',!open); if(open){ clearMsg('wd-msg'); renderWithdraw(); c.scrollIntoView({behavior:'smooth',block:'start'}); } }
+  function renderWithdraw(){
+    $('wd-available').textContent=vnd(wdAvail());
+    $('wd-bank-view').classList.toggle('hidden',!BANK); $('wd-request').classList.toggle('hidden',!BANK); $('wd-bank-form').classList.toggle('hidden',!!BANK);
+    if(BANK){ $('wd-bank-summary').innerHTML=`<b>${esc(BANK.bankName)}</b> · ${esc(BANK.accountNumber)}`; $('wd-bank-owner').textContent=BANK.accountName; }
+    $('wd-history').innerHTML=WDS.length?'<label style="margin-top:18px">Lịch sử rút tiền</label>'+WDS.map((w)=>{ const st=WD_LABEL[w.status];
+      return `<div class="hist-item"><div class="top"><span class="pill ${st.cls}">${st.label}</span><span class="meta">${w.at}</span></div><div style="font-size:18px;font-weight:800">${vnd(w.amount)}</div><div class="sub">${esc(w.bank.bankName)} · ${esc(w.bank.accountNumber)} · ${esc(w.bank.accountName)}</div></div>`; }).join(''):'';
+  }
+  function editBank(){ if(BANK){ $('wd-bank-name').value=BANK.bankName; $('wd-acc-num').value=BANK.accountNumber; $('wd-acc-name').value=BANK.accountName; } $('wd-bank-form').classList.remove('hidden'); $('wd-bank-view').classList.add('hidden'); $('wd-request').classList.add('hidden'); }
+  function saveBank(){ clearMsg('wd-msg'); const b={bankName:$('wd-bank-name').value.trim(),accountNumber:$('wd-acc-num').value.trim(),accountName:$('wd-acc-name').value.trim()}; if(!b.bankName||!b.accountNumber||!b.accountName) return msg('wd-msg','Nhập đủ ngân hàng, số tài khoản và tên chủ tài khoản'); BANK=b; msg('wd-msg','Đã lưu thông tin nhận tiền','ok'); renderWithdraw(); }
+  function setMaxWithdraw(){ $('wd-amount').value=wdAvail(); }
+  function requestWithdraw(){ clearMsg('wd-msg'); const a=Math.round(Number($('wd-amount').value)||0);
+    if(a<1000) return msg('wd-msg','Nhập số tiền muốn rút (tối thiểu 1.000 đ)'); if(a>wdAvail()) return msg('wd-msg','Chỉ có thể rút tối đa '+vnd(wdAvail()));
+    const w={amount:a,status:'pending',at:'vừa xong',bank:BANK}; WDS.unshift(w); $('wd-amount').value='';
+    msg('wd-msg','Đã gửi yêu cầu rút '+vnd(a)+'. Chờ quản trị viên chuyển khoản rồi xác nhận "Đã CK".','ok'); renderWithdraw(); loadEarnings();
   }
 
   function loadHistory(){

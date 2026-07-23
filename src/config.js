@@ -44,6 +44,8 @@ const config = {
     privateKey: process.env.VAPID_PRIVATE || '',
   },
   statusPollSeconds: parseInt(process.env.STATUS_POLL_SECONDS || '12', 10),
+  // Chu kỳ đồng bộ danh sách tài xế saycar về DB local (giờ)
+  driverSyncHours: parseFloat(process.env.DRIVER_SYNC_HOURS || '6'),
 
   // Hoa hồng cho người đặt hộ: % của tổng khách trả, chỉ tính khi chuyến HOÀN THÀNH
   commissionPercent: parseFloat(process.env.COMMISSION_PERCENT || '15'),

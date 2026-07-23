@@ -38,6 +38,7 @@ async function doRegister() {
     phone: $('reg-phone').value.trim(),
     password: $('reg-pass').value,
     confirmPassword: $('reg-pass2').value,
+    code: $('reg-code').value.trim(),
   };
   if (!body.phone || !body.password) return msg('reg-msg', 'Nhập số điện thoại và mật khẩu');
   if (body.password.length < 6) return msg('reg-msg', 'Mật khẩu tối thiểu 6 ký tự');
@@ -220,15 +221,113 @@ async function loadEarnings() {
   const r = await api('/bookings/earnings', 'GET', null, true);
   if (!r.ok) return;
   const d = r.data;
-  $('earn-total').textContent = vnd(d.earned);
+  $('earn-total').textContent = vnd(d.balance);
   const parts = [`${d.completedCount} chuyến hoàn thành`];
+  if (d.withdrawnPaid) parts.push(`đã rút ${vnd(d.withdrawnPaid)}`);
+  if (d.withdrawPending) parts.push(`chờ duyệt rút ${vnd(d.withdrawPending)}`);
   if (d.activeCount) parts.push(`đang chạy ${d.activeCount} · dự kiến +${vnd(d.pending)}`);
   parts.push(`hoa hồng ${d.percent}%`);
   $('earn-sub').textContent = parts.join(' · ');
 }
 
+// ===== Rút tiền =====
+let WD = { bank: {}, balance: null };
+
+const WD_STATUS = {
+  pending: { cls: 'pending', label: 'Chờ duyệt' },
+  paid: { cls: 'success', label: 'Đã chuyển khoản' },
+  rejected: { cls: 'failed', label: 'Từ chối' },
+};
+
+function toggleWithdraw() {
+  const card = $('withdraw-card');
+  const open = card.classList.contains('hidden');
+  card.classList.toggle('hidden', !open);
+  if (open) {
+    clearMsg('wd-msg');
+    loadWithdrawals().then(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+}
+
+async function loadWithdrawals() {
+  const r = await api('/withdrawals', 'GET', null, true);
+  if (!r.ok) return;
+  WD = r.data;
+  const hasBank = !!(WD.bank.bankName && WD.bank.accountNumber && WD.bank.accountName);
+  $('wd-available').textContent = vnd(WD.balance.available);
+  $('wd-bank-view').classList.toggle('hidden', !hasBank);
+  $('wd-request').classList.toggle('hidden', !hasBank);
+  $('wd-bank-form').classList.toggle('hidden', hasBank);
+  if (hasBank) {
+    $('wd-bank-summary').innerHTML = `<b>${esc(WD.bank.bankName)}</b> · ${esc(WD.bank.accountNumber)}`;
+    $('wd-bank-owner').textContent = WD.bank.accountName;
+  }
+  const box = $('wd-history');
+  if (!WD.rows.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '<label style="margin-top:18px">Lịch sử rút tiền</label>' + WD.rows.map((w) => {
+    const st = WD_STATUS[w.status] || { cls: 'pending', label: w.status };
+    return `<div class="hist-item">
+      <div class="top"><span class="pill ${st.cls}">${st.label}</span><span class="meta">${esc(w.created_at)}</span></div>
+      <div style="font-size:18px;font-weight:800">${vnd(w.amount)}</div>
+      <div class="sub">${esc(w.bank_name)} · ${esc(w.bank_account_number)} · ${esc(w.bank_account_name)}</div>
+    </div>`;
+  }).join('');
+}
+
+function editBank() {
+  $('wd-bank-name').value = WD.bank.bankName || '';
+  $('wd-acc-num').value = WD.bank.accountNumber || '';
+  $('wd-acc-name').value = WD.bank.accountName || '';
+  $('wd-bank-form').classList.remove('hidden');
+  $('wd-bank-view').classList.add('hidden');
+  $('wd-request').classList.add('hidden');
+}
+
+async function saveBank() {
+  clearMsg('wd-msg');
+  const body = {
+    bankName: $('wd-bank-name').value.trim(),
+    accountNumber: $('wd-acc-num').value.trim(),
+    accountName: $('wd-acc-name').value.trim(),
+  };
+  if (!body.bankName || !body.accountNumber || !body.accountName) {
+    return msg('wd-msg', 'Nhập đủ ngân hàng, số tài khoản và tên chủ tài khoản');
+  }
+  const btn = $('wd-bank-save');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  const r = await api('/withdrawals/bank', 'POST', body, true);
+  btn.disabled = false; btn.textContent = 'Lưu thông tin nhận tiền';
+  if (!r.ok) return msg('wd-msg', r.data.error || 'Không lưu được thông tin');
+  msg('wd-msg', 'Đã lưu thông tin nhận tiền', 'ok');
+  await loadWithdrawals();
+}
+
+function setMaxWithdraw() {
+  if (WD.balance) $('wd-amount').value = WD.balance.available;
+}
+
+async function requestWithdraw() {
+  clearMsg('wd-msg');
+  const amount = Math.round(Number($('wd-amount').value) || 0);
+  if (amount < 1000) return msg('wd-msg', 'Nhập số tiền muốn rút (tối thiểu 1.000 đ)');
+  if (WD.balance && amount > WD.balance.available) {
+    return msg('wd-msg', `Chỉ có thể rút tối đa ${vnd(WD.balance.available)}`);
+  }
+  if (!confirm(`Gửi yêu cầu rút ${vnd(amount)} về ${WD.bank.bankName} · ${WD.bank.accountNumber}?`)) return;
+  const btn = $('wd-submit');
+  btn.disabled = true; btn.textContent = 'Đang gửi...';
+  const r = await api('/withdrawals', 'POST', { amount }, true);
+  btn.disabled = false; btn.textContent = 'Gửi yêu cầu rút tiền';
+  if (!r.ok) return msg('wd-msg', r.data.error || 'Không gửi được yêu cầu');
+  $('wd-amount').value = '';
+  msg('wd-msg', `Đã gửi yêu cầu rút ${vnd(amount)}. Quản trị viên sẽ chuyển khoản rồi xác nhận.`, 'ok');
+  await loadWithdrawals();
+  loadEarnings();
+}
+
 async function loadHistory() {
   loadEarnings();
+  if (!$('withdraw-card').classList.contains('hidden')) loadWithdrawals();
   const r = await api('/bookings/mine', 'GET', null, true);
   const box = $('history');
   if (!r.ok || !r.data.length) { box.innerHTML = '<p class="muted">Chưa có chuyến nào.</p>'; return; }

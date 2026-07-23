@@ -26,6 +26,18 @@ Mở http://localhost:3000
 **Tài khoản admin:** người **đăng ký đầu tiên** tự thành admin. Hoặc chỉ định `ADMIN_PHONE`
 trong `.env`. Admin vào `/admin.html` để xem tất cả đơn và **khoá** tài khoản xấu.
 
+## Rút tiền (hoa hồng)
+
+1. Cộng tác viên bấm **💸 Rút tiền** trên thẻ số dư → nhập **ngân hàng + số TK + tên chủ TK**,
+   bấm **Lưu** (lần đầu; sau đó bấm **Sửa** để đổi).
+2. Nhập số tiền muốn rút → **Gửi yêu cầu**. Số tiền chờ duyệt bị **tạm giữ** (không rút quá số dư).
+3. Admin nhận thông báo, vào `/admin.html` mục **Yêu cầu rút tiền**, chuyển khoản tay rồi bấm
+   **✅ Đã chuyển khoản** → số dư của cộng tác viên **bị trừ tương ứng**. Bấm **Từ chối** thì
+   tiền quay lại số dư.
+
+> Số dư = hoa hồng các chuyến **hoàn thành** − tiền **đã CK**. Server luôn kiểm tra lại số dư
+> khi nhận yêu cầu (không tin số client gửi lên).
+
 > 🔒 Đăng ký đang **mở tự do** (ai có link cũng đăng ký + tạo đơn thật được). Muốn giới hạn:
 > đặt `REGISTER_CODE=<mã>` trong `.env` → chỉ người có mã mới đăng ký được.
 

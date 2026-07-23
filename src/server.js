@@ -9,6 +9,7 @@ app.use(express.json({ limit: '1mb' }));
 // API
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/withdrawals', require('./routes/withdrawals'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/demo', require('./routes/demo'));
@@ -24,5 +25,6 @@ app.listen(config.port, () => {
   if (!config.smtp.user) console.log('     - Chưa cấu hình SMTP -> mã OTP sẽ IN RA MÀN HÌNH này.');
   if (config.adminEmail) console.log('     - Email quản trị: ' + config.adminEmail);
   require('./status-poller').start();
+  require('./driver-sync').start();
   console.log('');
 });

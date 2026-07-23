@@ -3,6 +3,7 @@ const db = require('../db');
 const config = require('../config');
 const { auth } = require('../middleware');
 const saycar = require('../saycar/client');
+const { balanceOf } = require('../wallet');
 
 const router = express.Router();
 
@@ -105,18 +106,23 @@ router.get('/earnings', auth, (req, res) => {
     "SELECT total_amount, trip_status FROM bookings WHERE user_id = ? AND saycar_status = 'success'"
   ).all(req.user.id);
 
-  let earnedGross = 0, completedCount = 0, activeGross = 0, activeCount = 0;
+  let completedCount = 0, activeGross = 0, activeCount = 0;
   for (const r of rows) {
     const amt = Number(r.total_amount) || 0;
-    if (isCompleted(r.trip_status)) { completedCount++; earnedGross += amt; }
+    if (isCompleted(r.trip_status)) { completedCount++; }
     else if (!isCancelled(r.trip_status)) { activeCount++; activeGross += amt; }
   }
+  const bal = balanceOf(req.user.id);
   res.json({
     percent: config.commissionPercent,
-    earned: commissionOf(earnedGross),      // đã chốt (chuyến hoàn thành)
+    earned: bal.earned,                     // đã chốt (chuyến hoàn thành)
     completedCount,
     pending: commissionOf(activeGross),     // dự kiến (chuyến đang chạy)
     activeCount,
+    withdrawnPaid: bal.withdrawnPaid,       // đã rút (admin đã CK)
+    withdrawPending: bal.withdrawPending,   // đang chờ duyệt rút
+    balance: bal.balance,                   // số dư hiển thị = đã chốt - đã rút
+    available: bal.available,               // có thể gửi rút thêm
   });
 });
 

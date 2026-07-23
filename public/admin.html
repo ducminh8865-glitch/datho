@@ -14,8 +14,30 @@
     </div>
 
     <div class="card">
+      <h2>Yêu cầu rút tiền</h2>
+      <div id="withdrawals"><p class="muted">Đang tải...</p></div>
+    </div>
+
+    <div class="card">
       <h2>Hoa hồng phải trả cộng tác viên</h2>
       <div id="commissions"><p class="muted">Đang tải...</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Mã mời đăng ký</h2>
+      <div class="row">
+        <div><label>Mã (bỏ trống = tự sinh)</label><input id="inv-code" type="text" placeholder="VD: DOIHANOI" style="text-transform:uppercase" /></div>
+        <div><label>Số lượt (trống = ∞)</label><input id="inv-max" type="number" min="1" placeholder="Không giới hạn" /></div>
+      </div>
+      <button class="btn secondary" id="inv-create" onclick="createInvite()">+ Tạo mã mời</button>
+      <div id="invites" style="margin-top:6px"><p class="muted">Đang tải...</p></div>
+      <div class="drv-box">
+        <div>
+          <b style="font-size:14px">🚗 Tài xế saycar (miễn mã mời)</b>
+          <div class="muted" id="drv-status" style="margin-top:4px">Đang tải...</div>
+        </div>
+        <button class="btn sm" id="drv-sync" onclick="syncDrivers()">Đồng bộ ngay</button>
+      </div>
     </div>
 
     <div class="card">
