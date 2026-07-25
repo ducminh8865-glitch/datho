@@ -43,10 +43,10 @@ async function syncOnce() {
       for (const d of list) {
         const phone = normPhone(d.phone);
         if (!phone) continue;
-        const v = saycar.isDriverVerified(d) ? 1 : 0;
-        upsert.run(phone, d.firstName || d.name || '', v, statusFields(d));
+        // Endpoint /api/admin/manage/DRIVER = danh sách "Tài Xế Đã Xác Thực" -> tất cả đều đã xác thực
+        upsert.run(phone, d.firstName || d.name || '', 1, statusFields(d));
         total++;
-        if (v) verified++;
+        verified++;
       }
       if (list.length < 100) break;
     }

@@ -206,13 +206,8 @@ async function findDriver(phone) {
     const list = (data && data.data) || [];
     const d = list.find((x) => x && x.phone) || list[0];
     if (d) {
-      const verified = isDriverVerified(d);
-      if (!verified) {
-        // Ghi log các trường trạng thái để dễ chỉnh nếu saycar đặt tên khác
-        console.log('findDriver: thấy tài xế nhưng chưa nhận là "đã xác thực". Các trường:',
-          Object.keys(d).filter((k) => /status|verif|active/i.test(k)).map((k) => k + '=' + d[k]).join(', ') || '(không có trường trạng thái)');
-      }
-      return { name: d.firstName || d.name || '', phone: d.phone, verified };
+      // manage/DRIVER = danh sách tài xế ĐÃ XÁC THỰC -> tìm thấy tức là đã xác thực
+      return { name: d.firstName || d.name || '', phone: d.phone, verified: true };
     }
   }
   return null;
