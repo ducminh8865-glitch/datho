@@ -2,15 +2,59 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <title>SayCar · Đặt Hộ</title>
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#0ea5a4" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Đặt Hộ" />
 </head>
 <body>
   <div class="wrap">
     <div class="brand">
       <h1>SayCar · Đặt Hộ</h1>
       <p>Đặt chuyến hộ khách — kết nối thẳng hệ thống</p>
+    </div>
+
+    <!-- HƯỚNG DẪN CÀI RA MÀN HÌNH (hiện khi mở bằng trình duyệt, chưa cài) -->
+    <div id="view-install" class="hidden">
+      <div class="card install-hero">
+        <img src="/icon-192.png" alt="Đặt Hộ" class="install-icon" />
+        <h2>Cài “Đặt Hộ” ra màn hình</h2>
+        <p class="muted">Thêm ứng dụng vào màn hình điện thoại để mở nhanh như một app, nhận thông báo chuyến và rút tiền — không cần vào trình duyệt.</p>
+        <button id="install-btn" class="btn hidden">📲 Cài đặt ngay</button>
+      </div>
+
+      <!-- Hướng dẫn iPhone (Safari) -->
+      <div id="guide-ios" class="card guide hidden">
+        <h3>Trên iPhone / iPad (Safari)</h3>
+        <ol class="steps">
+          <li>Mở trang này bằng trình duyệt <b>Safari</b>.</li>
+          <li>Bấm nút <b>Chia sẻ</b> <span class="ic-share"></span> ở thanh dưới.</li>
+          <li>Chọn <b>“Thêm vào MH chính”</b> (Add to Home Screen).</li>
+          <li>Bấm <b>Thêm</b> — icon <b>Đặt Hộ</b> sẽ hiện ngoài màn hình.</li>
+        </ol>
+        <p class="muted done-note">Xong! Mở app bằng cách <b>bấm icon Đặt Hộ</b> ngoài màn hình.</p>
+      </div>
+
+      <!-- Hướng dẫn Android (Chrome) -->
+      <div id="guide-android" class="card guide hidden">
+        <h3>Trên Android (Chrome)</h3>
+        <ol class="steps">
+          <li>Bấm nút <b>⋮</b> (ba chấm) góc trên bên phải.</li>
+          <li>Chọn <b>“Thêm vào Màn hình chính”</b> hoặc <b>“Cài đặt ứng dụng”</b>.</li>
+          <li>Bấm <b>Cài đặt / Thêm</b> — icon <b>Đặt Hộ</b> hiện ngoài màn hình.</li>
+        </ol>
+        <p class="muted done-note">Xong! Mở app bằng cách <b>bấm icon Đặt Hộ</b> ngoài màn hình.</p>
+      </div>
+
+      <div class="center" style="margin-top:6px">
+        <button class="btn link" onclick="skipInstall()">Dùng tạm trên trình duyệt →</button>
+      </div>
     </div>
 
     <!-- ĐĂNG NHẬP -->

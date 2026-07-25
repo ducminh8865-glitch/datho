@@ -64,6 +64,40 @@ a.plain { color: var(--primary); }
 .earn-card .earn-btn { margin-top: 12px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .5); color: #fff; }
 .earn-card .earn-btn:hover { background: rgba(255, 255, 255, .28); }
 
+/* Trang hướng dẫn cài PWA */
+.install-hero { text-align: center; }
+.install-hero .install-icon { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 8px 24px rgba(2, 6, 23, .2); margin-bottom: 6px; }
+.install-hero h2 { margin: 10px 0 8px; }
+.install-hero .muted { font-size: 13.5px; line-height: 1.55; }
+.install-hero .btn { max-width: 260px; margin-left: auto; margin-right: auto; }
+.guide h3 { margin: 0 0 12px; font-size: 15px; color: var(--primary-d); }
+.guide .steps { margin: 0; padding-left: 0; list-style: none; counter-reset: step; }
+.guide .steps li { position: relative; padding: 0 0 14px 40px; font-size: 14px; line-height: 1.5; counter-increment: step; }
+.guide .steps li::before { content: counter(step); position: absolute; left: 0; top: -1px; width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.guide .steps li:not(:last-child)::after { content: ""; position: absolute; left: 13px; top: 28px; bottom: 4px; width: 2px; background: var(--border); }
+.guide .done-note { margin: 6px 0 0; padding: 10px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; color: #166534; font-size: 13px; }
+.ic-share { display: inline-block; width: 15px; height: 17px; vertical-align: -3px; border: 2px solid currentColor; border-top: none; border-radius: 3px; position: relative; }
+.ic-share::before { content: ""; position: absolute; left: 50%; top: -8px; transform: translateX(-50%); width: 2px; height: 9px; background: currentColor; }
+.ic-share::after { content: ""; position: absolute; left: 50%; top: -8px; transform: translateX(-50%) rotate(45deg); width: 6px; height: 6px; border-top: 2px solid currentColor; border-left: 2px solid currentColor; }
+
+/* Hộp xác nhận (modal) */
+.modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(2, 6, 23, .5); backdrop-filter: blur(2px); opacity: 0; transition: opacity .18s ease; }
+.modal-overlay.show { opacity: 1; }
+.modal { width: 100%; max-width: 380px; background: #fff; border-radius: 18px; padding: 22px;
+  box-shadow: 0 24px 70px rgba(2, 6, 23, .4); transform: translateY(10px) scale(.97); transition: transform .18s ease; }
+.modal-overlay.show .modal { transform: none; }
+.modal-title { font-size: 18px; font-weight: 800; margin-bottom: 12px; }
+.modal-body { font-size: 14.5px; color: var(--text); line-height: 1.55; }
+.modal-route { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.modal-route .leg .txt, .modal-route .leg span:last-child { font-size: 14px; line-height: 1.35; }
+.modal-total { font-size: 26px; font-weight: 800; color: #166534; text-align: center; margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
+.modal-note { color: var(--muted); font-size: 13px; margin-top: 10px; line-height: 1.5; }
+.modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+.modal-actions .btn { margin-top: 0; }
+.btn.danger { background: var(--danger); color: #fff; border: none; }
+.btn.danger:hover { background: #b91c1c; }
+
 /* Tài xế saycar (khối trong thẻ mã mời) */
 .drv-box { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px dashed var(--border); background: #f8fafc; border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
 

@@ -6,9 +6,57 @@ let TOKEN = localStorage.getItem('token') || '';
 const sel = { pickup: { placeId: '', text: '' }, dropoff: { placeId: '', text: '' } };
 
 function show(view) {
-  ['login', 'register', 'app'].forEach((v) => {
+  ['install', 'login', 'register', 'app'].forEach((v) => {
     $('view-' + v).classList.toggle('hidden', v !== view);
   });
+}
+
+// ===== PWA: cài ra màn hình =====
+// Đang chạy dạng app đã cài (mở từ icon màn hình)?
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.navigator.standalone === true;
+}
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  const btn = $('install-btn');
+  if (btn) {
+    btn.classList.remove('hidden');
+    btn.onclick = async () => {
+      deferredInstall.prompt();
+      const { outcome } = await deferredInstall.userChoice;
+      if (outcome === 'accepted') btn.textContent = '✅ Đang cài...';
+      deferredInstall = null;
+    };
+  }
+});
+// Cài xong -> vào thẳng app
+window.addEventListener('appinstalled', () => { localStorage.setItem('installed', '1'); enterOrAuth(); });
+
+function showInstallGuide() {
+  const ua = navigator.userAgent || '';
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (/(Mac)/.test(ua) && 'ontouchend' in document);
+  const isAndroid = /android/i.test(ua);
+  // Hiện hướng dẫn phù hợp; máy tính thì hiện cả hai để tham khảo
+  $('guide-ios').classList.toggle('hidden', !(isIOS || (!isIOS && !isAndroid)));
+  $('guide-android').classList.toggle('hidden', !(isAndroid || (!isIOS && !isAndroid)));
+  show('install');
+}
+function skipInstall() {
+  localStorage.setItem('skipInstall', '1');
+  enterOrAuth();
+}
+// Quyết định màn hình khi khởi động (khi CHƯA đăng nhập)
+function routeStart() {
+  const forceApp = new URLSearchParams(location.search).get('app') === '1';
+  if (isStandalone() || forceApp || localStorage.getItem('skipInstall') === '1' || localStorage.getItem('installed') === '1') {
+    show('login');
+  } else {
+    showInstallGuide();
+  }
 }
 function msg(el, text, type) {
   const m = $(el);
@@ -17,6 +65,31 @@ function msg(el, text, type) {
 }
 function clearMsg(el) { $(el).className = 'msg'; }
 const vnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) || 0)) + ' đ';
+
+// Hộp xác nhận đẹp (thay cho confirm() mặc định). Trả về Promise<boolean>.
+function uiConfirm({ title = 'Xác nhận', message = '', html = '', okText = 'Đồng ý', cancelText = 'Huỷ', danger = false } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML =
+      `<div class="modal" role="dialog" aria-modal="true">
+         <div class="modal-title">${esc(title)}</div>
+         <div class="modal-body">${html || esc(message)}</div>
+         <div class="modal-actions">
+           <button class="btn secondary modal-cancel">${esc(cancelText)}</button>
+           <button class="btn ${danger ? 'danger' : ''} modal-ok">${esc(okText)}</button>
+         </div>
+       </div>`;
+    document.body.appendChild(overlay);
+    const done = (v) => { document.removeEventListener('keydown', onKey); overlay.classList.remove('show'); setTimeout(() => overlay.remove(), 180); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') done(false); else if (e.key === 'Enter') done(true); };
+    overlay.querySelector('.modal-cancel').onclick = () => done(false);
+    overlay.querySelector('.modal-ok').onclick = () => done(true);
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done(false); });
+    document.addEventListener('keydown', onKey);
+    requestAnimationFrame(() => { overlay.classList.add('show'); overlay.querySelector('.modal-ok').focus(); });
+  });
+}
 
 async function api(path, method, body, useAuth) {
   const headers = { 'Content-Type': 'application/json' };
@@ -176,7 +249,19 @@ async function doBooking() {
   if (!phone) return msg('b-msg', 'Nhập số điện thoại khách');
   if (!sel.pickup.placeId || !sel.dropoff.placeId) return msg('b-msg', 'Hãy chọn lại điểm đón/đến rồi Tính giá');
 
-  if (!confirm('Xác nhận tạo chuyến thật? Hệ thống sẽ gán tài xế ngay.')) return;
+  const totalTxt = ($('b-price').querySelector('.total') || {}).textContent || '';
+  const ok = await uiConfirm({
+    title: 'Xác nhận đặt chuyến',
+    html:
+      `<div class="modal-route">
+         <div class="leg from"><span class="pin"></span><span>${esc(sel.pickup.text)}</span></div>
+         <div class="leg to"><span class="pin"></span><span>${esc(sel.dropoff.text)}</span></div>
+       </div>
+       ${totalTxt ? `<div class="modal-total">${esc(totalTxt)}</div>` : ''}
+       <div class="modal-note">Hệ thống sẽ tạo chuyến <b>thật</b> và gán tài xế ngay.</div>`,
+    okText: 'Đặt chuyến',
+  });
+  if (!ok) return;
 
   const btn = $('b-submit');
   btn.disabled = true; btn.textContent = 'Đang đặt...';
@@ -313,7 +398,14 @@ async function requestWithdraw() {
   if (WD.balance && amount > WD.balance.available) {
     return msg('wd-msg', `Chỉ có thể rút tối đa ${vnd(WD.balance.available)}`);
   }
-  if (!confirm(`Gửi yêu cầu rút ${vnd(amount)} về ${WD.bank.bankName} · ${WD.bank.accountNumber}?`)) return;
+  const ok = await uiConfirm({
+    title: 'Xác nhận rút tiền',
+    html:
+      `<div class="modal-total">${vnd(amount)}</div>
+       <div class="modal-note">Chuyển về <b>${esc(WD.bank.bankName)}</b><br>${esc(WD.bank.accountNumber)} · ${esc(WD.bank.accountName)}</div>`,
+    okText: 'Gửi yêu cầu',
+  });
+  if (!ok) return;
   const btn = $('wd-submit');
   btn.disabled = true; btn.textContent = 'Đang gửi...';
   const r = await api('/withdrawals', 'POST', { amount }, true);
@@ -424,11 +516,23 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ===== Khởi động =====
-(async function init() {
+function registerSW() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+async function enterOrAuth() {
   if (TOKEN) {
     const me = await api('/auth/me', 'GET', null, true);
     if (me.ok) return enterApp();
-    logout();
+    TOKEN = ''; localStorage.removeItem('token');
   }
   show('login');
+}
+(async function init() {
+  registerSW();
+  if (TOKEN) {
+    const me = await api('/auth/me', 'GET', null, true);
+    if (me.ok) return enterApp();
+    TOKEN = ''; localStorage.removeItem('token');
+  }
+  routeStart();
 })();

@@ -1,4 +1,14 @@
-// Service worker: nhận thông báo đẩy kể cả khi không mở app
+// Service worker: nhận thông báo đẩy + cho phép cài PWA ra màn hình
+
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+
+// Fetch pass-through (tối thiểu để trình duyệt nhận app là cài được).
+// Không cache API để dữ liệu luôn mới; các request khác đi thẳng ra mạng.
+self.addEventListener('fetch', (event) => {
+  // để mặc định trình duyệt xử lý; chỉ cần có handler này là đủ điều kiện cài
+  return;
+});
 
 self.addEventListener('push', (event) => {
   let data = {};
