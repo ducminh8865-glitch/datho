@@ -54,26 +54,34 @@ function baseHeaders(token) {
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
+let loginInFlight = null; // gộp nhiều lần đăng nhập đồng thời thành 1
 
 async function login(force) {
   if (config.saycar.mock) return 'mock-token';
   if (!force && cachedToken && Date.now() < tokenExpiresAt) return cachedToken;
+  // Đã có 1 lượt đăng nhập đang chạy -> dùng chung, không đăng nhập lại nhiều lần
+  if (loginInFlight) return loginInFlight;
 
-  const url = config.saycar.baseUrl + config.saycar.loginPath;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: baseHeaders(),
-    body: JSON.stringify({ username: config.saycar.username, password: config.saycar.password }),
-  });
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = {}; }
-  if (!res.ok || !data.token) {
-    throw new Error('Đăng nhập saycar thất bại (HTTP ' + res.status + '): ' + text.slice(0, 300));
-  }
-  cachedToken = data.token;
-  tokenExpiresAt = Date.now() + 50 * 60 * 1000; // token ~1h, làm mới sớm
-  return cachedToken;
+  loginInFlight = (async () => {
+    const url = config.saycar.baseUrl + config.saycar.loginPath;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: baseHeaders(),
+      body: JSON.stringify({ username: config.saycar.username, password: config.saycar.password }),
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = {}; }
+    if (!res.ok || !data.token) {
+      throw new Error('Đăng nhập saycar thất bại (HTTP ' + res.status + '): ' + text.slice(0, 300));
+    }
+    cachedToken = data.token;
+    tokenExpiresAt = Date.now() + 50 * 60 * 1000; // token ~1h, làm mới sớm
+    return cachedToken;
+  })();
+
+  try { return await loginInFlight; }
+  finally { loginInFlight = null; }
 }
 
 async function authedFetch(path, { method = 'GET', body } = {}) {
