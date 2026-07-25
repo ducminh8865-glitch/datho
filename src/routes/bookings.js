@@ -117,7 +117,24 @@ router.post('/:id/cancel', auth, async (req, res) => {
     return res.status(400).json({ error: 'Quá thời gian huỷ (chỉ huỷ trong 10 giây đầu sau khi đặt)' });
   }
   try {
-    await saycar.cancelBooking({ bookId: row.saycar_ref, shortCode: row.short_code });
+    // Bám ĐÚNG chuyến: mặc định dùng mã lưu lúc tạo, nhưng nếu có shortCode thì
+    // tra lại saycar theo shortCode và CHỈ dùng bookingId đó khi shortCode khớp tuyệt đối.
+    let bookId = row.saycar_ref;
+    let shortCode = row.short_code;
+    if (shortCode) {
+      const st = await saycar.getStatusByShortCode(shortCode);
+      if (st && String(st.shortCode) === String(shortCode)) {
+        if (saycar.isTerminal(st.status)) {
+          db.prepare('UPDATE bookings SET trip_status = ? WHERE id = ?').run(st.status, row.id);
+          return res.status(400).json({ error: 'Chuyến "' + saycar.statusLabel(st.status) + '", không huỷ được nữa' });
+        }
+        if (st.bookingId) bookId = st.bookingId; // bookingId chuẩn saycar cho đúng shortCode này
+      }
+      // shortCode không khớp -> KHÔNG dùng dữ liệu lạ, giữ nguyên mã lưu lúc tạo
+    }
+    if (!bookId) return res.status(400).json({ error: 'Không xác định được mã chuyến trên saycar' });
+
+    await saycar.cancelBooking({ bookId, shortCode });
     db.prepare("UPDATE bookings SET trip_status = 'canceled' WHERE id = ?").run(row.id);
     res.json({ ok: true });
   } catch (e) {
