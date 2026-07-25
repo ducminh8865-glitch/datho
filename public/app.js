@@ -440,6 +440,11 @@ function histItemHtml(b) {
     : (b.earned
       ? `<div class="comm earned">Hoa hồng: +${vnd(b.commission)}</div>`
       : `<div class="comm">Hoa hồng (dự kiến): +${vnd(b.commission)}</div>`);
+  // Huỷ được khi: đã đẩy sang saycar thành công và chuyến chưa kết thúc/huỷ
+  const canCancel = b.status === 'success' && !b.earned && !b.cancelled;
+  const cancelBtn = canCancel
+    ? `<button class="btn secondary sm hist-cancel" onclick="cancelTrip(${b.id})">Huỷ chuyến</button>`
+    : '';
   return `<div class="hist-item">
     <div class="top">
       <span class="pill ${pill.cls}">${esc(pill.label)}</span>
@@ -451,6 +456,7 @@ function histItemHtml(b) {
     ${driver}
     ${comm}
     ${b.error ? `<div class="err">${esc(b.error)}</div>` : ''}
+    ${cancelBtn ? `<div class="hist-actions">${cancelBtn}</div>` : ''}
   </div>`;
 }
 
@@ -476,6 +482,20 @@ function gotoHistPage(n) {
   histPage = n;
   renderHistory();
   $('history').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function cancelTrip(id) {
+  const ok = await uiConfirm({
+    title: 'Huỷ chuyến',
+    html: '<div class="modal-note">Huỷ chuyến này? Hệ thống sẽ <b>huỷ luôn trên saycar</b> và không hoàn tác được.</div>',
+    okText: 'Huỷ chuyến',
+    cancelText: 'Không',
+    danger: true,
+  });
+  if (!ok) return;
+  const r = await api('/bookings/' + id + '/cancel', 'POST', null, true);
+  if (!r.ok) return alert((r.data && r.data.error) || 'Huỷ chuyến thất bại');
+  await loadHistory();
 }
 
 // Tự động làm mới trạng thái mỗi 25 giây khi đang ở màn hình app

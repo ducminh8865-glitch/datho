@@ -303,9 +303,18 @@ async function getStatusByShortCode(shortCode) {
   };
 }
 
+// --- Huỷ chuyến (giống nút "Huỷ chuyến" trên admin saycar) ---
+async function cancelBooking({ bookId, shortCode }) {
+  if (config.saycar.mock) return { ok: true };
+  const q = 'bookId=' + encodeURIComponent(bookId) + '&shortCode=' + encodeURIComponent(shortCode || '');
+  await authedFetch('/api/admin/driver/reject-trip?' + q, { method: 'POST' });
+  return { ok: true };
+}
+
 module.exports = {
   login,
   autocomplete,
+  cancelBooking,
   placeDetail,
   preview,
   findCustomer,

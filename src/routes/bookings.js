@@ -100,6 +100,25 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// Huỷ chuyến -> huỷ luôn trên saycar
+router.post('/:id/cancel', auth, async (req, res) => {
+  const row = db.prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ error: 'Không tìm thấy chuyến của bạn' });
+  if (row.saycar_status !== 'success' || !row.saycar_ref) {
+    return res.status(400).json({ error: 'Chuyến chưa được tạo trên saycar nên không cần huỷ' });
+  }
+  if (saycar.isTerminal(row.trip_status)) {
+    return res.status(400).json({ error: 'Chuyến đã kết thúc/đã huỷ, không thể huỷ nữa' });
+  }
+  try {
+    await saycar.cancelBooking({ bookId: row.saycar_ref, shortCode: row.short_code });
+    db.prepare("UPDATE bookings SET trip_status = 'canceled' WHERE id = ?").run(row.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: 'Huỷ chuyến trên saycar thất bại: ' + (e.message || e) });
+  }
+});
+
 // Thu nhập (hoa hồng) của tôi
 router.get('/earnings', auth, (req, res) => {
   const rows = db.prepare(
