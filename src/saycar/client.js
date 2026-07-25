@@ -163,6 +163,17 @@ async function findCustomer(phone) {
   return { userUUID: c.id, name: c.firstName || '', phone: c.phone };
 }
 
+// --- Tạo khách "guest" cho khách MỚI (saycar bắt buộc userUUID hợp lệ khi đặt chuyến) ---
+// Đây là bước admin saycar dùng: GET /api/admin/user/detail?firstName=&phoneNumber= -> tạo & trả về khách.
+async function createGuestCustomer(name, phone) {
+  if (config.saycar.mock) return { userUUID: 'mock-uuid', name, phone };
+  const q = 'firstName=' + encodeURIComponent(name || phone) + '&phoneNumber=' + encodeURIComponent(phone);
+  const data = await authedFetch('/api/admin/user/detail?' + q, { method: 'GET' });
+  const list = Array.isArray(data) ? data : (data && data.data) || [];
+  const c = list[0];
+  return c ? { userUUID: c.id, name: c.firstName || name, phone: c.phone || phone } : null;
+}
+
 // --- Tra TÀI XẾ theo SĐT (dùng để miễn mã mời khi đăng ký) ---
 // Trả về { name, phone, verified } hoặc null nếu không thấy.
 function isDriverVerified(d) {
@@ -222,7 +233,13 @@ async function createBooking({ fromPlaceId, toPlaceId, vehicle = 'CAR', customer
 
   // Tính giá lại ở server (không tin giá do client gửi lên) để đảm bảo đúng
   const { price, from, to } = await preview({ fromPlaceId, toPlaceId, vehicle });
-  const customer = await findCustomer(customerPhone);
+
+  // Tra khách theo SĐT; nếu là khách MỚI -> tạo hồ sơ guest để có userUUID hợp lệ.
+  let customer = await findCustomer(customerPhone);
+  if (!customer || !customer.userUUID) {
+    customer = await createGuestCustomer(customerName, customerPhone);
+    if (!customer || !customer.userUUID) throw new Error('Không tạo được hồ sơ khách trên saycar');
+  }
 
   const payload = {
     ...price, // vehicle, distance, duration, các trường giá, type
@@ -230,8 +247,8 @@ async function createBooking({ fromPlaceId, toPlaceId, vehicle = 'CAR', customer
     fromLocation: from.address,
     origins: from.coords,
     toLocation: to.address,
-    userUUID: customer ? customer.userUUID : '',
-    firstName: customerName || (customer && customer.name) || '',
+    userUUID: customer.userUUID,
+    firstName: customerName || customer.name || '',
     fromPlaceId,
     toPlaceId,
     phoneNumber: customerPhone,
@@ -289,6 +306,7 @@ module.exports = {
   placeDetail,
   preview,
   findCustomer,
+  createGuestCustomer,
   findDriver,
   listDrivers,
   isDriverVerified,
