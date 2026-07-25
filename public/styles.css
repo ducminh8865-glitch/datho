@@ -64,6 +64,17 @@ a.plain { color: var(--primary); }
 .earn-card .earn-btn { margin-top: 12px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .5); color: #fff; }
 .earn-card .earn-btn:hover { background: rgba(255, 255, 255, .28); }
 
+/* Nút hỗ trợ Zalo (nổi) */
+.support-fab {
+  position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 900;
+  display: flex; align-items: center; gap: 7px; padding: 11px 16px 11px 13px;
+  background: #0068ff; color: #fff; border-radius: 999px; text-decoration: none;
+  font-weight: 700; font-size: 14px; box-shadow: 0 8px 22px rgba(0, 104, 255, .45);
+}
+.support-fab:hover { background: #0055d4; }
+.support-fab:active { transform: scale(.96); }
+.support-fab svg { width: 22px; height: 22px; flex: none; }
+
 /* Trang hướng dẫn cài PWA */
 .install-hero { text-align: center; }
 .install-hero .install-icon { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 8px 24px rgba(2, 6, 23, .2); margin-bottom: 6px; }
