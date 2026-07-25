@@ -286,6 +286,7 @@ async function doBooking() {
   sel.pickup = { placeId: '', text: '' };
   sel.dropoff = { placeId: '', text: '' };
   invalidatePrice();
+  histPage = 1;
   await loadHistory();
 }
 
@@ -417,34 +418,64 @@ async function requestWithdraw() {
   loadEarnings();
 }
 
+// Phân trang lịch sử: 5 chuyến / trang
+let histRows = [];
+let histPage = 1;
+const HIST_PER_PAGE = 5;
+
 async function loadHistory() {
   loadEarnings();
   if (!$('withdraw-card').classList.contains('hidden')) loadWithdrawals();
   const r = await api('/bookings/mine', 'GET', null, true);
+  histRows = (r.ok && r.data) || [];
+  renderHistory();
+}
+
+function histItemHtml(b) {
+  const p = b.payload || {};
+  const pill = tripPill(b);
+  const meta = [p.total ? vnd(p.total) : '', b.shortCode ? '#' + esc(b.shortCode) : ''].filter(Boolean).join(' · ');
+  const driver = p.driverName ? `<div class="sub">Tài xế: <b>${esc(p.driverName)}</b></div>` : '';
+  const comm = b.cancelled ? ''
+    : (b.earned
+      ? `<div class="comm earned">Hoa hồng: +${vnd(b.commission)}</div>`
+      : `<div class="comm">Hoa hồng (dự kiến): +${vnd(b.commission)}</div>`);
+  return `<div class="hist-item">
+    <div class="top">
+      <span class="pill ${pill.cls}">${esc(pill.label)}</span>
+      <span class="meta">${meta}</span>
+    </div>
+    <div class="leg from"><span class="pin"></span><span class="txt">${esc(p.pickup)}</span></div>
+    <div class="leg to"><span class="pin"></span><span class="txt">${esc(p.dropoff)}</span></div>
+    <div class="sub">Khách: <b>${esc(p.customerName || '-')}</b>${p.customerPhone ? ' · ' + esc(p.customerPhone) : ''}</div>
+    ${driver}
+    ${comm}
+    ${b.error ? `<div class="err">${esc(b.error)}</div>` : ''}
+  </div>`;
+}
+
+function renderHistory() {
   const box = $('history');
-  if (!r.ok || !r.data.length) { box.innerHTML = '<p class="muted">Chưa có chuyến nào.</p>'; return; }
-  box.innerHTML = r.data.map((b) => {
-    const p = b.payload || {};
-    const pill = tripPill(b);
-    const meta = [p.total ? vnd(p.total) : '', b.shortCode ? '#' + esc(b.shortCode) : ''].filter(Boolean).join(' · ');
-    const driver = p.driverName ? `<div class="sub">Tài xế: <b>${esc(p.driverName)}</b></div>` : '';
-    const comm = b.cancelled ? ''
-      : (b.earned
-        ? `<div class="comm earned">Hoa hồng: +${vnd(b.commission)}</div>`
-        : `<div class="comm">Hoa hồng (dự kiến): +${vnd(b.commission)}</div>`);
-    return `<div class="hist-item">
-      <div class="top">
-        <span class="pill ${pill.cls}">${esc(pill.label)}</span>
-        <span class="meta">${meta}</span>
-      </div>
-      <div class="leg from"><span class="pin"></span><span class="txt">${esc(p.pickup)}</span></div>
-      <div class="leg to"><span class="pin"></span><span class="txt">${esc(p.dropoff)}</span></div>
-      <div class="sub">Khách: <b>${esc(p.customerName || '-')}</b>${p.customerPhone ? ' · ' + esc(p.customerPhone) : ''}</div>
-      ${driver}
-      ${comm}
-      ${b.error ? `<div class="err">${esc(b.error)}</div>` : ''}
-    </div>`;
-  }).join('');
+  if (!histRows.length) { box.innerHTML = '<p class="muted">Chưa có chuyến nào.</p>'; return; }
+  const pages = Math.ceil(histRows.length / HIST_PER_PAGE);
+  if (histPage > pages) histPage = pages;
+  if (histPage < 1) histPage = 1;
+  const start = (histPage - 1) * HIST_PER_PAGE;
+  const items = histRows.slice(start, start + HIST_PER_PAGE).map(histItemHtml).join('');
+  const pager = pages > 1
+    ? `<div class="pager">
+         <button class="pg-btn" ${histPage === 1 ? 'disabled' : ''} onclick="gotoHistPage(${histPage - 1})">‹</button>
+         <span class="pg-info">Trang ${histPage}/${pages}</span>
+         <button class="pg-btn" ${histPage === pages ? 'disabled' : ''} onclick="gotoHistPage(${histPage + 1})">›</button>
+       </div>`
+    : '';
+  box.innerHTML = items + pager;
+}
+
+function gotoHistPage(n) {
+  histPage = n;
+  renderHistory();
+  $('history').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Tự động làm mới trạng thái mỗi 25 giây khi đang ở màn hình app
