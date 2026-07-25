@@ -20,6 +20,27 @@ function esc(s) {
 }
 const vnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) || 0)) + ' đ';
 
+async function loadStats() {
+  const r = await api('/admin/stats');
+  if (!r.ok) return;
+  const o = r.data.overall || {};
+  const box = $('stats');
+  const tile = (n, l) => `<div class="stat-tile"><div class="stat-num">${n || 0}</div><div class="stat-lbl">${l}</div></div>`;
+  const tiles = `<div class="stat-row">${tile(o.today, 'Hôm nay')}${tile(o.month, 'Tháng này')}${tile(o.year, 'Năm nay')}${tile(o.total, 'Tổng cộng')}</div>`;
+  const rows = r.data.byUser || [];
+  const table = rows.length
+    ? `<div class="stat-tbl-title">Số chuyến theo từng người</div>
+       <div class="stat-scroll"><table class="stat-table">
+         <thead><tr><th>Người đặt</th><th>Hôm nay</th><th>Tháng</th><th>Năm</th><th>Tổng</th></tr></thead>
+         <tbody>${rows.map((u) => `<tr>
+           <td class="who">${esc(u.name && u.name !== u.phone ? u.name + ' · ' + u.phone : u.phone)}</td>
+           <td>${u.today}</td><td>${u.month}</td><td>${u.year}</td><td><b>${u.total}</b></td>
+         </tr>`).join('')}</tbody>
+       </table></div>`
+    : '<p class="muted" style="margin-top:12px">Chưa có chuyến nào.</p>';
+  box.innerHTML = tiles + table;
+}
+
 async function loadCommissions() {
   const r = await api('/admin/commissions');
   if (!r.ok) return;
@@ -238,5 +259,5 @@ async function loadBookings() {
 
 (async function () {
   const ok = await loadUsers();
-  if (ok) { loadWithdrawals(); loadCommissions(); loadInvites(); loadDriverStatus(); loadBookings(); }
+  if (ok) { loadStats(); loadWithdrawals(); loadCommissions(); loadInvites(); loadDriverStatus(); loadBookings(); }
 })();

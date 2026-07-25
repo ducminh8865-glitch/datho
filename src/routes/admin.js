@@ -42,6 +42,30 @@ router.get('/commissions', auth, adminOnly, (req, res) => {
   });
 });
 
+// ===== Thống kê chuyến đặt hộ (theo giờ VN = UTC+7) =====
+router.get('/stats', auth, adminOnly, (req, res) => {
+  // Chỉ tính chuyến đã đẩy sang saycar thành công (chuyến thật)
+  const overall = db.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN date(created_at,'+7 hours')=date('now','+7 hours') THEN 1 ELSE 0 END),0) AS today,
+      COALESCE(SUM(CASE WHEN strftime('%Y-%m',created_at,'+7 hours')=strftime('%Y-%m','now','+7 hours') THEN 1 ELSE 0 END),0) AS month,
+      COALESCE(SUM(CASE WHEN strftime('%Y',created_at,'+7 hours')=strftime('%Y','now','+7 hours') THEN 1 ELSE 0 END),0) AS year,
+      COUNT(*) AS total
+    FROM bookings WHERE saycar_status='success'
+  `).get();
+  const byUser = db.prepare(`
+    SELECT u.id, u.phone, u.name,
+      SUM(CASE WHEN date(b.created_at,'+7 hours')=date('now','+7 hours') THEN 1 ELSE 0 END) AS today,
+      SUM(CASE WHEN strftime('%Y-%m',b.created_at,'+7 hours')=strftime('%Y-%m','now','+7 hours') THEN 1 ELSE 0 END) AS month,
+      SUM(CASE WHEN strftime('%Y',b.created_at,'+7 hours')=strftime('%Y','now','+7 hours') THEN 1 ELSE 0 END) AS year,
+      COUNT(b.id) AS total
+    FROM users u JOIN bookings b ON b.user_id=u.id AND b.saycar_status='success'
+    GROUP BY u.id
+    ORDER BY total DESC, today DESC
+  `).all();
+  res.json({ overall, byUser });
+});
+
 // ===== Yêu cầu rút tiền =====
 router.get('/withdrawals', auth, adminOnly, (req, res) => {
   const rows = db.prepare(
