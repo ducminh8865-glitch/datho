@@ -8,6 +8,9 @@ const { balanceOf } = require('../wallet');
 const router = express.Router();
 
 const RATE = config.commissionPercent / 100;
+const CANCEL_WINDOW_MS = 10000;  // nút huỷ chỉ hiện trong 10 giây đầu
+const CANCEL_GRACE_MS = 15000;   // server cho phép huỷ tới 15s (bù độ trễ mạng)
+const ageMsOf = (createdAt) => Date.now() - new Date(String(createdAt).replace(' ', 'T') + 'Z').getTime();
 const norm = (s) => String(s || '').toLowerCase().replace(/_/g, '-');
 const isCompleted = (s) => norm(s) === 'completed';
 const isCancelled = (s) => ['canceled', 'cancelled', 'rejected', 'expired'].includes(norm(s));
@@ -110,6 +113,9 @@ router.post('/:id/cancel', auth, async (req, res) => {
   if (saycar.isTerminal(row.trip_status)) {
     return res.status(400).json({ error: 'Chuyến đã kết thúc/đã huỷ, không thể huỷ nữa' });
   }
+  if (ageMsOf(row.created_at) > CANCEL_GRACE_MS) {
+    return res.status(400).json({ error: 'Quá thời gian huỷ (chỉ huỷ trong 10 giây đầu sau khi đặt)' });
+  }
   try {
     await saycar.cancelBooking({ bookId: row.saycar_ref, shortCode: row.short_code });
     db.prepare("UPDATE bookings SET trip_status = 'canceled' WHERE id = ?").run(row.id);
@@ -167,21 +173,28 @@ router.get('/mine', auth, async (req, res) => {
     } catch { /* bỏ qua lỗi tra trạng thái */ }
   }));
 
-  res.json(rows.map((r) => ({
-    id: r.id,
-    status: r.saycar_status,
-    tripStatus: r.trip_status,
-    tripStatusLabel: r.trip_status ? saycar.statusLabel(r.trip_status) : null,
-    ref: r.saycar_ref,
-    shortCode: r.short_code,
-    total: r.total_amount,
-    commission: commissionOf(r.total_amount),   // hoa hồng của chuyến
-    earned: isCompleted(r.trip_status),         // đã chốt hay chưa
-    cancelled: isCancelled(r.trip_status),
-    error: r.error,
-    created_at: r.created_at,
-    payload: JSON.parse(r.payload_json),
-  })));
+  res.json(rows.map((r) => {
+    const cancelable = r.saycar_status === 'success' && r.saycar_ref && !saycar.isTerminal(r.trip_status);
+    const cancelSecondsLeft = cancelable
+      ? Math.max(0, Math.ceil((CANCEL_WINDOW_MS - ageMsOf(r.created_at)) / 1000))
+      : 0;
+    return {
+      id: r.id,
+      status: r.saycar_status,
+      tripStatus: r.trip_status,
+      tripStatusLabel: r.trip_status ? saycar.statusLabel(r.trip_status) : null,
+      ref: r.saycar_ref,
+      shortCode: r.short_code,
+      total: r.total_amount,
+      commission: commissionOf(r.total_amount),   // hoa hồng của chuyến
+      earned: isCompleted(r.trip_status),         // đã chốt hay chưa
+      cancelled: isCancelled(r.trip_status),
+      cancelSecondsLeft,                          // giây còn lại để huỷ (0 = không huỷ được)
+      error: r.error,
+      created_at: r.created_at,
+      payload: JSON.parse(r.payload_json),
+    };
+  }));
 });
 
 module.exports = router;

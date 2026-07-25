@@ -440,10 +440,13 @@ function histItemHtml(b) {
     : (b.earned
       ? `<div class="comm earned">Hoa hồng: +${vnd(b.commission)}</div>`
       : `<div class="comm">Hoa hồng (dự kiến): +${vnd(b.commission)}</div>`);
-  // Huỷ được khi: đã đẩy sang saycar thành công và chuyến chưa kết thúc/huỷ
-  const canCancel = b.status === 'success' && !b.earned && !b.cancelled;
-  const cancelBtn = canCancel
-    ? `<button class="btn secondary sm hist-cancel" onclick="cancelTrip(${b.id})">Huỷ chuyến</button>`
+  // Huỷ được: đã đẩy saycar thành công, chưa kết thúc, và còn trong 10 giây đầu
+  const canCancel = b.status === 'success' && !b.earned && !b.cancelled && b.cancelSecondsLeft > 0;
+  const cancelBlock = canCancel
+    ? `<div class="hist-actions" data-cancel-deadline="${Date.now() + b.cancelSecondsLeft * 1000}">
+         <span class="cancel-count">${b.cancelSecondsLeft}s</span>
+         <button class="btn secondary sm hist-cancel" onclick="cancelTrip(${b.id})">Huỷ chuyến</button>
+       </div>`
     : '';
   return `<div class="hist-item">
     <div class="top">
@@ -456,7 +459,7 @@ function histItemHtml(b) {
     ${driver}
     ${comm}
     ${b.error ? `<div class="err">${esc(b.error)}</div>` : ''}
-    ${cancelBtn ? `<div class="hist-actions">${cancelBtn}</div>` : ''}
+    ${cancelBlock}
   </div>`;
 }
 
@@ -476,12 +479,30 @@ function renderHistory() {
        </div>`
     : '';
   box.innerHTML = items + pager;
+  startCancelCountdown();
 }
 
 function gotoHistPage(n) {
   histPage = n;
   renderHistory();
   $('history').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Đếm ngược nút huỷ: cập nhật mỗi 0.5s, hết giờ thì bỏ nút
+let cancelTicker = null;
+function startCancelCountdown() {
+  if (cancelTicker) return;
+  cancelTicker = setInterval(() => {
+    const els = document.querySelectorAll('.hist-actions[data-cancel-deadline]');
+    if (!els.length) return;
+    const now = Date.now();
+    els.forEach((el) => {
+      const left = Math.ceil((Number(el.getAttribute('data-cancel-deadline')) - now) / 1000);
+      if (left <= 0) { el.remove(); return; }
+      const c = el.querySelector('.cancel-count');
+      if (c) c.textContent = left + 's';
+    });
+  }, 500);
 }
 
 async function cancelTrip(id) {

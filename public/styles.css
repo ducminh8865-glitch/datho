@@ -65,7 +65,8 @@ a.plain { color: var(--primary); }
 .earn-card .earn-btn:hover { background: rgba(255, 255, 255, .28); }
 
 /* Nút huỷ chuyến trong lịch sử */
-.hist-actions { margin-top: 12px; display: flex; justify-content: flex-end; }
+.hist-actions { margin-top: 12px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.hist-actions .cancel-count { font-size: 13px; font-weight: 700; color: var(--danger); font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
 .btn.hist-cancel { color: var(--danger); border-color: #fecaca; }
 .btn.hist-cancel:hover { background: #fef2f2; }
 
