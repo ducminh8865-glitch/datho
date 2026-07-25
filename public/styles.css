@@ -20,7 +20,7 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
-.wrap { max-width: 480px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 34px) 16px 32px; }
+.wrap { max-width: 480px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 18px) 16px 32px; }
 .brand { color: #fff; text-align: center; padding: 8px 0 16px; }
 .brand h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
 .brand p { margin: 5px 0 0; opacity: .92; font-size: 13px; }
