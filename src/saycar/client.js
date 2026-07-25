@@ -166,14 +166,14 @@ async function findCustomer(phone) {
 // --- Tra TÀI XẾ theo SĐT (dùng để miễn mã mời khi đăng ký) ---
 // Trả về { name, phone, verified } hoặc null nếu không thấy.
 function isDriverVerified(d) {
-  // Tên trường xác thực của saycar có thể khác nhau -> kiểm tra các khả năng phổ biến
+  // saycar: tài xế được PHÉP NHẬN CHUYẾN (allowOnTrip) = đã xác thực & đang hoạt động.
+  // Đây là cờ khớp với danh sách "Tài Xế Đã Xác Thực" trên admin saycar.
+  if (d.allowOnTrip === true) return true;
+  // Dự phòng nếu saycar đổi cấu trúc dữ liệu sau này
   const truthy = (v) =>
     v === true || v === 1 ||
     ['1', 'true', 'yes', 'verified', 'approved', 'active'].includes(String(v || '').toLowerCase());
-  if (truthy(d.verified) || truthy(d.isVerified) || truthy(d.verify) ||
-      truthy(d.statusVerify) || truthy(d.verifyStatus) || truthy(d.identityVerified)) return true;
-  const st = String(d.status || d.statusDriver || d.statusAccount || '').toLowerCase().replace(/_/g, '-');
-  return ['active', 'verified', 'approved'].includes(st);
+  return truthy(d.verified) || truthy(d.isVerified) || truthy(d.isVerify);
 }
 
 async function findDriver(phone) {

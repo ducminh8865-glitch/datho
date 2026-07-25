@@ -19,11 +19,13 @@ const upsert = db.prepare(`
     raw_status = excluded.raw_status, synced_at = excluded.synced_at
 `);
 
-// Các trường trạng thái gốc của saycar (lưu lại để debug khi cần chỉnh isDriverVerified)
+// Vài trường gốc của saycar (lưu lại để tra khi cần)
 function statusFields(d) {
-  const out = {};
-  for (const k of Object.keys(d)) if (/status|verif|active/i.test(k)) out[k] = d[k];
-  return JSON.stringify(out);
+  return JSON.stringify({
+    allowOnTrip: d.allowOnTrip,
+    hasIdentify: !!d.identifyNumber,
+    bookingCompleted: d.bookingCompleted,
+  });
 }
 
 let running = false;
