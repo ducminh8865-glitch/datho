@@ -142,7 +142,7 @@ router.post('/drivers/sync', auth, adminOnly, async (req, res) => {
 // Danh sách tài khoản
 router.get('/users', auth, adminOnly, (req, res) => {
   const rows = db.prepare(
-    'SELECT id, phone, name, status, role, invite_code, created_at FROM users ORDER BY id DESC'
+    'SELECT id, phone, name, status, role, invite_code, referrer_driver_phone, referrer_driver_name, created_at FROM users ORDER BY id DESC'
   ).all();
   res.json(rows);
 });

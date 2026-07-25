@@ -199,7 +199,9 @@ async function loadUsers() {
         <span class="pill ${u.status === 'active' ? 'success' : 'failed'}">${STATUS_VI[u.status] || u.status}</span>
       </div>
       ${u.name && u.name !== u.phone ? `<div class="sub">${esc(u.name)}</div>` : ''}
-      ${u.invite_code ? `<div class="sub">Vào bằng: <b>${u.invite_code === 'TÀI XẾ SAYCAR' ? '🚗 SĐT tài xế saycar' : 'mã ' + esc(u.invite_code)}</b></div>` : ''}
+      ${u.referrer_driver_phone
+        ? `<div class="sub">🚗 Tài xế giới thiệu: <b>${esc((u.referrer_driver_name || '').trim())} ${esc(u.referrer_driver_phone)}</b></div>`
+        : (u.invite_code ? `<div class="sub">Vào bằng: <b>mã ${esc(u.invite_code)}</b></div>` : '')}
       ${actions.length ? `<div style="margin-top:10px;display:flex;gap:8px">${actions.join('')}</div>` : ''}
     </div>`;
   }).join('');

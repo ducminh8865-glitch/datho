@@ -34,39 +34,48 @@ router.post('/register', async (req, res) => {
     if (password.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
     if (password !== confirm) return res.status(400).json({ error: 'Mật khẩu xác nhận không khớp' });
 
-    // Cổng mã mời: mở khi có mã hệ thống (.env) HOẶC có mã do admin tạo còn hoạt động
+    // Ô "Mã mời" nhận: mã hệ thống (.env) / mã do admin tạo / SĐT tài xế saycar giới thiệu.
     const code = String(req.body.code || '').trim();
     const activeCodes = db.prepare("SELECT COUNT(*) AS c FROM invite_codes WHERE status = 'active'").get().c;
-    let invite = null;
-    let driverExempt = false;
-    if (config.registerCode || activeCodes > 0) {
-      const okEnv = config.registerCode && code === config.registerCode;
-      if (!okEnv) {
-        invite = code
-          ? db.prepare("SELECT * FROM invite_codes WHERE code = ? AND status = 'active'").get(code.toUpperCase())
-          : null;
-        const hasLeft = invite && (invite.max_uses == null || invite.used_count < invite.max_uses);
-        if (!hasLeft) {
-          invite = null;
-          // Không có mã hợp lệ -> nếu SĐT trùng TÀI XẾ ĐÃ XÁC THỰC trên saycar thì miễn mã.
-          // Check bảng đồng bộ local trước (nhanh); không thấy mới tra sống trên saycar.
-          const local = driverSync.findLocal(phone);
-          if (local && local.verified) {
-            driverExempt = true;
-          } else if (!local) {
-            let driver = null;
-            try { driver = await saycar.findDriver(phone); }
-            catch (e) { console.error('findDriver lỗi (bỏ qua, vẫn yêu cầu mã):', e.message || e); }
-            if (driver && driver.verified) {
-              driverExempt = true;
-              driverSync.rememberVerified(phone, driver.name); // ghi vào bảng local luôn
+    const gated = !!config.registerCode || activeCodes > 0;
+
+    let usedEnvCode = false;   // dùng mã mời hệ thống trong .env
+    let invite = null;         // mã mời do admin tạo
+    let refDriverPhone = null; // SĐT tài xế giới thiệu
+    let refDriverName = null;  // tên tài xế giới thiệu
+
+    if (code) {
+      if (config.registerCode && code === config.registerCode) {
+        usedEnvCode = true;
+      } else {
+        const inv = db.prepare("SELECT * FROM invite_codes WHERE code = ? AND status = 'active'").get(code.toUpperCase());
+        if (inv && (inv.max_uses == null || inv.used_count < inv.max_uses)) {
+          invite = inv;
+        } else {
+          // Không phải mã mời -> thử coi là SĐT tài xế đã xác thực trên saycar (người giới thiệu).
+          const cp = normPhone(code);
+          if (validPhone(cp)) {
+            const local = driverSync.findLocal(cp);
+            if (local && local.verified) {
+              refDriverPhone = cp; refDriverName = local.name || '';
+            } else if (!local) {
+              // Chưa có trong bảng đồng bộ -> tra sống trên saycar
+              try {
+                const drv = await saycar.findDriver(cp);
+                if (drv && drv.verified) {
+                  refDriverPhone = cp; refDriverName = drv.name || '';
+                  driverSync.rememberVerified(cp, drv.name);
+                }
+              } catch (e) { console.error('findDriver (giới thiệu) lỗi:', e.message || e); }
             }
-          }
-          if (!driverExempt) {
-            return res.status(403).json({ error: 'Mã mời không đúng hoặc đã hết lượt' });
           }
         }
       }
+    }
+
+    // Nếu đang khoá đăng ký: phải có mã hợp lệ HOẶC SĐT tài xế giới thiệu hợp lệ
+    if (gated && !usedEnvCode && !invite && !refDriverPhone) {
+      return res.status(403).json({ error: 'Mã mời sai/hết lượt, hoặc SĐT tài xế giới thiệu không hợp lệ' });
     }
 
     const existing = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
@@ -81,12 +90,14 @@ router.post('/register', async (req, res) => {
       "INSERT INTO users (phone, name, password_hash, status, role) VALUES (?,?,?, 'active', ?)"
     ).run(phone, name, password_hash, isAdmin ? 'admin' : 'collaborator');
 
-    // Trừ lượt mã mời + ghi lại ai dùng mã nào / ai vào bằng SĐT tài xế
+    // Ghi lại nguồn đăng ký: mã mời hoặc tài xế giới thiệu
     if (invite) {
       db.prepare('UPDATE invite_codes SET used_count = used_count + 1 WHERE id = ?').run(invite.id);
       db.prepare('UPDATE users SET invite_code = ? WHERE id = ?').run(invite.code, ins.lastInsertRowid);
-    } else if (driverExempt) {
-      db.prepare('UPDATE users SET invite_code = ? WHERE id = ?').run('TÀI XẾ SAYCAR', ins.lastInsertRowid);
+    }
+    if (refDriverPhone) {
+      db.prepare('UPDATE users SET referrer_driver_phone = ?, referrer_driver_name = ? WHERE id = ?')
+        .run(refDriverPhone, refDriverName || '', ins.lastInsertRowid);
     }
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(ins.lastInsertRowid);

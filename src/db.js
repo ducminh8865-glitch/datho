@@ -41,6 +41,8 @@ for (const stmt of [
   "ALTER TABLE users ADD COLUMN bank_account_number TEXT",
   "ALTER TABLE users ADD COLUMN bank_account_name TEXT",
   "ALTER TABLE users ADD COLUMN invite_code TEXT",         // đăng ký bằng mã mời nào
+  "ALTER TABLE users ADD COLUMN referrer_driver_phone TEXT", // SĐT tài xế saycar đã giới thiệu
+  "ALTER TABLE users ADD COLUMN referrer_driver_name TEXT",  // tên tài xế giới thiệu (lúc đăng ký)
 ]) {
   try { db.exec(stmt); } catch { /* cột đã tồn tại */ }
 }
