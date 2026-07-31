@@ -3,9 +3,11 @@ const db = require('../db');
 const { auth } = require('../middleware');
 const { balanceOf } = require('../wallet');
 const push = require('../push');
+const telegram = require('../telegram');
 
 const router = express.Router();
 const vnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) || 0)) + ' đ';
+const nowVN = () => new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 // Số dư + thông tin nhận tiền + lịch sử rút của tôi
 router.get('/', auth, (req, res) => {
@@ -67,6 +69,18 @@ router.post('/', auth, (req, res) => {
     url: '/admin.html',
     tag: 'withdrawal-' + ins.lastInsertRowid,
   }))).catch(() => {});
+
+  // Báo về Telegram admin
+  telegram.send(
+    '💸 YÊU CẦU RÚT TIỀN\n' +
+    `👤 Người rút: ${u.name || u.phone} · ${u.phone}\n` +
+    `💰 Số tiền: ${vnd(amount)}\n` +
+    `🏦 ${u.bank_name}\n` +
+    `🔢 STK: ${u.bank_account_number}\n` +
+    `👤 Chủ TK: ${u.bank_account_name}\n` +
+    `🕒 ${nowVN()}\n` +
+    '👉 Vào /admin.html để duyệt (bấm "Đã CK").'
+  ).catch(() => {});
 
   res.json({ ok: true, id: ins.lastInsertRowid, balance: balanceOf(u.id) });
 });
