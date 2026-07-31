@@ -60,7 +60,11 @@ router.post('/preview', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
   const { fromPlaceId, toPlaceId, fromText, toText, vehicle, customerName, customerPhone, paymentMethod } = req.body || {};
   if (!fromPlaceId || !toPlaceId) return res.status(400).json({ error: 'Hãy chọn điểm đón và điểm đến từ gợi ý' });
-  if (!String(customerPhone || '').trim()) return res.status(400).json({ error: 'Thiếu số điện thoại khách' });
+  const cphone = String(customerPhone || '').replace(/[\s.\-()]/g, '');
+  if (!cphone) return res.status(400).json({ error: 'Thiếu số điện thoại khách' });
+  if (!/^(0\d{9}|\+84\d{9}|84\d{9})$/.test(cphone)) {
+    return res.status(400).json({ error: 'Số điện thoại khách không hợp lệ (cần 10 số, ví dụ 09xxxxxxxx)' });
+  }
 
   const summary = {
     pickup: fromText || '',
@@ -97,9 +101,17 @@ router.post('/', auth, async (req, res) => {
 
     res.json({ ok: true, bookingId, saycar: result });
   } catch (e) {
-    const msg = String(e.message || e);
-    db.prepare('UPDATE bookings SET saycar_status = ?, error = ? WHERE id = ?').run('failed', msg, bookingId);
-    res.status(502).json({ ok: false, bookingId, error: 'Không tạo được chuyến trên saycar: ' + msg });
+    const raw = String(e.message || e);
+    let friendly;
+    if (/USER_DUPLICATE_BOOKING|đang trong chuyến/i.test(raw)) {
+      friendly = 'Khách này đang có chuyến chưa hoàn thành trên hệ thống — không thể đặt thêm. Hãy đợi chuyến hiện tại xong (hoặc huỷ) rồi đặt lại.';
+    } else if (/sai định dạng|INVALID.*PHONE|phoneNumber|user\/detail/i.test(raw)) {
+      friendly = 'Số điện thoại khách không hợp lệ.';
+    } else {
+      friendly = 'Không tạo được chuyến trên saycar: ' + raw;
+    }
+    db.prepare('UPDATE bookings SET saycar_status = ?, error = ? WHERE id = ?').run('failed', raw, bookingId);
+    res.status(502).json({ ok: false, bookingId, error: friendly });
   }
 });
 

@@ -247,6 +247,8 @@ async function doBooking() {
   clearMsg('b-msg');
   const phone = $('b-cphone').value.trim();
   if (!phone) return msg('b-msg', 'Nhập số điện thoại khách');
+  const phoneNorm = phone.replace(/[\s.\-()]/g, '');
+  if (!/^(0\d{9}|\+84\d{9}|84\d{9})$/.test(phoneNorm)) return msg('b-msg', 'Số điện thoại khách chưa đúng (cần 10 số, VD 09xxxxxxxx)');
   if (!sel.pickup.placeId || !sel.dropoff.placeId) return msg('b-msg', 'Hãy chọn lại điểm đón/đến rồi Tính giá');
 
   const totalTxt = ($('b-price').querySelector('.total') || {}).textContent || '';
