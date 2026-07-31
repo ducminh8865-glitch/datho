@@ -305,6 +305,18 @@ function tripPill(b) {
   return { cls, label: b.tripStatusLabel || 'Đã gửi' };
 }
 
+// Rút gọn lỗi saycar thành câu dễ hiểu cho cộng tác viên
+function friendlyError(raw) {
+  const s = String(raw || '');
+  if (/USER_DUPLICATE_BOOKING|đang trong chuyến/i.test(s)) return 'Khách đang có chuyến chưa hoàn thành — không đặt thêm được. Đợi xong (hoặc huỷ) rồi đặt lại.';
+  if (/sai định dạng|INVALID.*PHONE|user\/detail|phoneNumber/i.test(s)) return 'Số điện thoại khách không hợp lệ.';
+  if (/NO_PERMISSION|API key/i.test(s)) return 'Lỗi kết nối hệ thống, thử lại sau.';
+  // cắt bỏ phần JSON kỹ thuật nếu có
+  const m = s.match(/"message":"([^"]+)"/);
+  if (m) return m[1];
+  return s.length > 120 ? s.slice(0, 120) + '…' : s;
+}
+
 async function loadEarnings() {
   const r = await api('/bookings/earnings', 'GET', null, true);
   if (!r.ok) return;
@@ -460,7 +472,7 @@ function histItemHtml(b) {
     <div class="sub">Khách: <b>${esc(p.customerName || '-')}</b>${p.customerPhone ? ' · ' + esc(p.customerPhone) : ''}</div>
     ${driver}
     ${comm}
-    ${b.error ? `<div class="err">${esc(b.error)}</div>` : ''}
+    ${b.error ? `<div class="err">${esc(friendlyError(b.error))}</div>` : ''}
     ${cancelBlock}
   </div>`;
 }
