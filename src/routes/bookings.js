@@ -4,6 +4,10 @@ const config = require('../config');
 const { auth } = require('../middleware');
 const saycar = require('../saycar/client');
 const { balanceOf } = require('../wallet');
+const telegram = require('../telegram');
+
+const vnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) || 0)) + ' đ';
+const nowVN = () => new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 const router = express.Router();
 
@@ -119,6 +123,18 @@ router.post('/', auth, async (req, res) => {
       .run('success', ref, shortCode, tripStatus, totalAmount, JSON.stringify(summary), bookingId);
 
     res.json({ ok: true, bookingId, saycar: result });
+
+    // Đẩy thông báo về Telegram admin (không chặn luồng)
+    telegram.send(
+      '🚗 CHUYẾN ĐẶT HỘ MỚI\n' +
+      `👤 Người đặt: ${req.user.name || req.user.phone} · ${req.user.phone}\n` +
+      `🙍 Khách: ${customerName || '-'} · ${customerPhone}\n` +
+      `📍 Đón: ${summary.pickup}\n` +
+      `🏁 Đến: ${summary.dropoff}\n` +
+      `💰 ${vnd(totalAmount)}${shortCode ? ' · Mã ' + shortCode : ''}` +
+      (result.driverName ? `\n🧑‍✈️ Tài xế: ${result.driverName}${result.driverPhoneNumber ? ' · ' + result.driverPhoneNumber : ''}` : '') +
+      `\n🕒 ${nowVN()}`
+    ).catch(() => {});
   } catch (e) {
     const raw = String(e.message || e);
     let friendly;
@@ -131,6 +147,16 @@ router.post('/', auth, async (req, res) => {
     }
     db.prepare('UPDATE bookings SET saycar_status = ?, error = ? WHERE id = ?').run('failed', raw, bookingId);
     res.status(502).json({ ok: false, bookingId, error: friendly });
+
+    telegram.send(
+      '❌ ĐẶT CHUYẾN LỖI\n' +
+      `👤 Người đặt: ${req.user.name || req.user.phone} · ${req.user.phone}\n` +
+      `🙍 Khách: ${customerName || '-'} · ${customerPhone}\n` +
+      `📍 Đón: ${summary.pickup}\n` +
+      `🏁 Đến: ${summary.dropoff}\n` +
+      `⚠️ Lý do: ${friendly}\n` +
+      `🕒 ${nowVN()}`
+    ).catch(() => {});
   }
 });
 

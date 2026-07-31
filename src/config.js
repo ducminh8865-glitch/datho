@@ -43,6 +43,12 @@ const config = {
     publicKey: process.env.VAPID_PUBLIC || '',
     privateKey: process.env.VAPID_PRIVATE || '',
   },
+
+  // Bot Telegram để đẩy thông báo chuyến đặt hộ cho admin
+  telegram: {
+    token: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
+    chatId: (process.env.TELEGRAM_CHAT_ID || '').trim(),
+  },
   statusPollSeconds: parseInt(process.env.STATUS_POLL_SECONDS || '12', 10),
   // Chu kỳ đồng bộ danh sách tài xế saycar về DB local (giờ)
   driverSyncHours: parseFloat(process.env.DRIVER_SYNC_HOURS || '6'),
