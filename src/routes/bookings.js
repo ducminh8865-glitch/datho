@@ -8,6 +8,16 @@ const { balanceOf } = require('../wallet');
 const router = express.Router();
 
 const RATE = config.commissionPercent / 100;
+// Chống spam chuyến ảo: giới hạn số chuyến/giờ theo từng người.
+// Tài khoản MỚI (chưa có chuyến hoàn thành nào) bị siết chặt hơn để giảm thiệt hại nếu bị chiếm.
+const BOOK_HOURLY_NEW = 8;
+const BOOK_HOURLY_TRUSTED = 30;
+function bookingCap(userId) {
+  const done = db.prepare(
+    "SELECT COUNT(*) AS c FROM bookings WHERE user_id=? AND saycar_status='success' AND lower(replace(trip_status,'_','-'))='completed'"
+  ).get(userId).c;
+  return done >= 1 ? BOOK_HOURLY_TRUSTED : BOOK_HOURLY_NEW;
+}
 const CANCEL_WINDOW_MS = 10000;  // nút huỷ chỉ hiện trong 10 giây đầu
 const CANCEL_GRACE_MS = 15000;   // server cho phép huỷ tới 15s (bù độ trễ mạng)
 const ageMsOf = (createdAt) => Date.now() - new Date(String(createdAt).replace(' ', 'T') + 'Z').getTime();
@@ -64,6 +74,15 @@ router.post('/', auth, async (req, res) => {
   if (!cphone) return res.status(400).json({ error: 'Thiếu số điện thoại khách' });
   if (!/^(0\d{9}|\+84\d{9}|84\d{9})$/.test(cphone)) {
     return res.status(400).json({ error: 'Số điện thoại khách không hợp lệ (cần 10 số, ví dụ 09xxxxxxxx)' });
+  }
+
+  // Chống spam chuyến ảo: giới hạn số chuyến/giờ theo người đặt
+  const recentCount = db.prepare(
+    "SELECT COUNT(*) AS c FROM bookings WHERE user_id = ? AND created_at > datetime('now','-1 hour')"
+  ).get(req.user.id).c;
+  const cap = bookingCap(req.user.id);
+  if (recentCount >= cap) {
+    return res.status(429).json({ error: `Bạn đã tạo ${recentCount} chuyến trong 1 giờ (giới hạn ${cap}/giờ). Vui lòng thử lại sau.` });
   }
 
   const summary = {
