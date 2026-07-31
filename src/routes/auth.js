@@ -5,6 +5,7 @@ const { auth } = require('../middleware');
 const { hashPassword, verifyPassword, signToken } = require('../auth-utils');
 const saycar = require('../saycar/client');
 const driverSync = require('../driver-sync');
+const { loginLockLeftSec, recordLoginFail, resetLogin } = require('../rate-limit');
 
 const router = express.Router();
 
@@ -130,13 +131,20 @@ router.post('/login', async (req, res) => {
   try {
     const phone = normPhone(req.body.phone);
     const password = String(req.body.password || '');
+
+    // Chống dò mật khẩu: khoá SĐT sau nhiều lần sai
+    const lock = loginLockLeftSec(phone);
+    if (lock) return res.status(429).json({ error: `Sai mật khẩu nhiều lần. Thử lại sau ${Math.ceil(lock / 60)} phút.` });
+
     const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
 
     if (!user || !(await verifyPassword(password, user.password_hash))) {
+      recordLoginFail(phone);
       return res.status(401).json({ error: 'Số điện thoại hoặc mật khẩu không đúng' });
     }
     if (user.status === 'blocked') return res.status(403).json({ error: 'Tài khoản đã bị khoá' });
 
+    resetLogin(phone);
     const token = signToken(user);
     res.json({ ok: true, token, user: publicUser(user) });
   } catch (e) {
