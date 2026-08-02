@@ -11,7 +11,6 @@ const nowVN = () => new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_
 
 const router = express.Router();
 
-const RATE = config.commissionPercent / 100;
 // Chống spam chuyến ảo: giới hạn số chuyến/giờ theo từng người.
 // Tài khoản MỚI (chưa có chuyến hoàn thành nào) bị siết chặt hơn để giảm thiệt hại nếu bị chiếm.
 const BOOK_HOURLY_NEW = 8;
@@ -28,7 +27,6 @@ const ageMsOf = (createdAt) => Date.now() - new Date(String(createdAt).replace('
 const norm = (s) => String(s || '').toLowerCase().replace(/_/g, '-');
 const isCompleted = (s) => norm(s) === 'completed';
 const isCancelled = (s) => ['canceled', 'cancelled', 'rejected', 'expired'].includes(norm(s));
-const commissionOf = (amount) => Math.round((Number(amount) || 0) * RATE);
 // Hoa hồng theo % riêng của từng chuyến (khách sẵn có = 5%); chuyến cũ chưa có cột thì dùng % mặc định
 const commissionOfRow = (amount, pct) => Math.round((Number(amount) || 0) * (pct == null ? config.commissionPercent : pct) / 100);
 
