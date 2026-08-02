@@ -55,6 +55,8 @@ const config = {
 
   // Hoa hồng cho người đặt hộ: % của tổng khách trả, chỉ tính khi chuyến HOÀN THÀNH
   commissionPercent: parseFloat(process.env.COMMISSION_PERCENT || '15'),
+  // Hoa hồng thấp hơn khi khách ĐÃ CÓ trong hệ thống saycar (khuyến khích báo khách tự đặt trên app)
+  existingCustomerPercent: parseFloat(process.env.EXISTING_CUSTOMER_PERCENT || '5'),
 
   otpTtlMinutes: 10,
   otpMaxAttempts: 5,

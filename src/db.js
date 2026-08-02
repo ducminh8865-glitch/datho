@@ -37,6 +37,7 @@ for (const stmt of [
   "ALTER TABLE bookings ADD COLUMN short_code TEXT",       // mã chuyến, dùng để tra trạng thái
   "ALTER TABLE bookings ADD COLUMN trip_status TEXT",      // trạng thái chuyến từ saycar
   "ALTER TABLE bookings ADD COLUMN total_amount REAL",     // tổng khách trả (để tính hoa hồng)
+  "ALTER TABLE bookings ADD COLUMN commission_pct REAL",   // % hoa hồng của CHUYẾN này (khách sẵn có = 5%)
   "ALTER TABLE users ADD COLUMN bank_name TEXT",           // thông tin nhận tiền rút
   "ALTER TABLE users ADD COLUMN bank_account_number TEXT",
   "ALTER TABLE users ADD COLUMN bank_account_name TEXT",

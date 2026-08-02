@@ -29,6 +29,8 @@ const norm = (s) => String(s || '').toLowerCase().replace(/_/g, '-');
 const isCompleted = (s) => norm(s) === 'completed';
 const isCancelled = (s) => ['canceled', 'cancelled', 'rejected', 'expired'].includes(norm(s));
 const commissionOf = (amount) => Math.round((Number(amount) || 0) * RATE);
+// Hoa hồng theo % riêng của từng chuyến (khách sẵn có = 5%); chuyến cũ chưa có cột thì dùng % mặc định
+const commissionOfRow = (amount, pct) => Math.round((Number(amount) || 0) * (pct == null ? config.commissionPercent : pct) / 100);
 
 // Dữ liệu cho form: loại xe, phương thức thanh toán
 router.get('/ref-data', auth, (req, res) => {
@@ -45,6 +47,22 @@ router.post('/autocomplete', auth, async (req, res) => {
   } catch (e) {
     // saycar thỉnh thoảng trả 500 cho vài chuỗi — không làm hỏng trải nghiệm gõ
     res.json({ predictions: [], warn: String(e.message || e) });
+  }
+});
+
+// Kiểm tra SĐT khách có sẵn trên saycar không (để cảnh báo + báo mức hoa hồng)
+router.post('/check-customer', auth, async (req, res) => {
+  const phone = String(req.body.phone || '').replace(/[\s.\-()]/g, '');
+  if (!/^(0\d{9}|\+84\d{9}|84\d{9})$/.test(phone)) return res.json({ existing: false });
+  try {
+    const r = await saycar.checkCustomer(phone);
+    res.json({
+      existing: !!r.existing,
+      name: r.name || '',
+      commissionPercent: r.existing ? config.existingCustomerPercent : config.commissionPercent,
+    });
+  } catch (e) {
+    res.json({ existing: false, warn: String(e.message || e) });
   }
 });
 
@@ -119,8 +137,11 @@ router.post('/', auth, async (req, res) => {
     const shortCode = result.shortCode || null;
     const tripStatus = result.statusBooking || null;
     const totalAmount = Number(result.totalAmount) || 0;
-    db.prepare('UPDATE bookings SET saycar_status = ?, saycar_ref = ?, short_code = ?, trip_status = ?, total_amount = ?, payload_json = ? WHERE id = ?')
-      .run('success', ref, shortCode, tripStatus, totalAmount, JSON.stringify(summary), bookingId);
+    // Khách sẵn có trên saycar -> hoa hồng thấp (5%); khách mới -> hoa hồng thường
+    const commissionPct = result.existingCustomer ? config.existingCustomerPercent : config.commissionPercent;
+    summary.existingCustomer = !!result.existingCustomer;
+    db.prepare('UPDATE bookings SET saycar_status = ?, saycar_ref = ?, short_code = ?, trip_status = ?, total_amount = ?, commission_pct = ?, payload_json = ? WHERE id = ?')
+      .run('success', ref, shortCode, tripStatus, totalAmount, commissionPct, JSON.stringify(summary), bookingId);
 
     res.json({ ok: true, bookingId, saycar: result });
 
@@ -202,21 +223,20 @@ router.post('/:id/cancel', auth, async (req, res) => {
 // Thu nhập (hoa hồng) của tôi
 router.get('/earnings', auth, (req, res) => {
   const rows = db.prepare(
-    "SELECT total_amount, trip_status FROM bookings WHERE user_id = ? AND saycar_status = 'success'"
+    "SELECT total_amount, trip_status, commission_pct FROM bookings WHERE user_id = ? AND saycar_status = 'success'"
   ).all(req.user.id);
 
-  let completedCount = 0, activeGross = 0, activeCount = 0;
+  let completedCount = 0, pendingCommission = 0, activeCount = 0;
   for (const r of rows) {
-    const amt = Number(r.total_amount) || 0;
     if (isCompleted(r.trip_status)) { completedCount++; }
-    else if (!isCancelled(r.trip_status)) { activeCount++; activeGross += amt; }
+    else if (!isCancelled(r.trip_status)) { activeCount++; pendingCommission += commissionOfRow(r.total_amount, r.commission_pct); }
   }
   const bal = balanceOf(req.user.id);
   res.json({
     percent: config.commissionPercent,
     earned: bal.earned,                     // đã chốt (chuyến hoàn thành)
     completedCount,
-    pending: commissionOf(activeGross),     // dự kiến (chuyến đang chạy)
+    pending: pendingCommission,             // dự kiến (chuyến đang chạy)
     activeCount,
     withdrawnPaid: bal.withdrawnPaid,       // đã rút (admin đã CK)
     withdrawPending: bal.withdrawPending,   // đang chờ duyệt rút
@@ -228,7 +248,7 @@ router.get('/earnings', auth, (req, res) => {
 // Lịch sử đơn của chính tôi (kèm làm mới trạng thái các chuyến còn hoạt động)
 router.get('/mine', auth, async (req, res) => {
   const rows = db.prepare(
-    'SELECT id, payload_json, saycar_status, saycar_ref, short_code, trip_status, total_amount, error, created_at FROM bookings WHERE user_id = ? ORDER BY id DESC LIMIT 100'
+    'SELECT id, payload_json, saycar_status, saycar_ref, short_code, trip_status, total_amount, commission_pct, error, created_at FROM bookings WHERE user_id = ? ORDER BY id DESC LIMIT 100'
   ).all(req.user.id);
 
   // Làm mới trạng thái cho các chuyến đã đẩy thành công và chưa ở trạng thái cuối
@@ -260,7 +280,8 @@ router.get('/mine', auth, async (req, res) => {
       ref: r.saycar_ref,
       shortCode: r.short_code,
       total: r.total_amount,
-      commission: commissionOf(r.total_amount),   // hoa hồng của chuyến
+      commission: commissionOfRow(r.total_amount, r.commission_pct),   // hoa hồng của chuyến (theo % riêng)
+      commissionPct: r.commission_pct == null ? config.commissionPercent : r.commission_pct,
       earned: isCompleted(r.trip_status),         // đã chốt hay chưa
       cancelled: isCancelled(r.trip_status),
       cancelSecondsLeft,                          // giây còn lại để huỷ (0 = không huỷ được)

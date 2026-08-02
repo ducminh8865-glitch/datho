@@ -3,17 +3,15 @@
 const db = require('./db');
 const config = require('./config');
 
-const RATE = config.commissionPercent / 100;
-
-// Hoa hồng đã chốt (chỉ tính chuyến HOÀN THÀNH)
+// Hoa hồng đã chốt (chỉ tính chuyến HOÀN THÀNH), theo % riêng của từng chuyến
 function earnedOf(userId) {
   const r = db.prepare(
-    `SELECT COALESCE(SUM(total_amount), 0) AS gross
+    `SELECT COALESCE(SUM(total_amount * COALESCE(commission_pct, ?) / 100), 0) AS earned
      FROM bookings
      WHERE user_id = ? AND saycar_status = 'success'
        AND lower(replace(trip_status, '_', '-')) = 'completed'`
-  ).get(userId);
-  return Math.round(r.gross * RATE);
+  ).get(config.commissionPercent, userId);
+  return Math.round(r.earned);
 }
 
 // Tổng tiền đã rút (admin đã CK) và đang chờ duyệt

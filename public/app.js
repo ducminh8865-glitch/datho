@@ -147,6 +147,7 @@ async function enterApp() {
   setupAutocomplete('b-pickup', 'ac-pickup', 'pickup');
   setupAutocomplete('b-dropoff', 'ac-dropoff', 'dropoff');
   $('b-vehicle').addEventListener('change', invalidatePrice);
+  $('b-cphone').addEventListener('blur', checkCustomer);
   await loadHistory();
   startHistoryAutoRefresh();
   refreshNotiBanner();
@@ -211,6 +212,25 @@ function renderList(list, preds, onPick) {
 }
 function hideList(list) { list.classList.add('hidden'); }
 
+// ===== Cảnh báo khách sẵn có trên saycar =====
+let custIsExisting = false;
+async function checkCustomer() {
+  const warn = $('cust-warn');
+  const phone = $('b-cphone').value.replace(/[\s.\-()]/g, '');
+  custIsExisting = false;
+  if (!/^(0\d{9}|\+84\d{9}|84\d{9})$/.test(phone)) { warn.classList.add('hidden'); return; }
+  try {
+    const r = await api('/bookings/check-customer', 'POST', { phone }, true);
+    if (r.ok && r.data.existing) {
+      custIsExisting = true;
+      warn.innerHTML = `⚠️ <b>Khách hàng này đã có trong hệ thống SayCar.</b> Vui lòng báo khách <b>đặt trực tiếp trên APP SayCar</b>. Nếu đặt qua hệ thống này, bạn <b>chỉ được tính hoa hồng ${r.data.commissionPercent}%</b>.`;
+      warn.classList.remove('hidden');
+    } else {
+      warn.classList.add('hidden');
+    }
+  } catch { warn.classList.add('hidden'); }
+}
+
 // ===== Tính giá =====
 function invalidatePrice() {
   $('b-price').classList.add('hidden');
@@ -252,6 +272,9 @@ async function doBooking() {
   if (!sel.pickup.placeId || !sel.dropoff.placeId) return msg('b-msg', 'Hãy chọn lại điểm đón/đến rồi Tính giá');
 
   const totalTxt = ($('b-price').querySelector('.total') || {}).textContent || '';
+  const existingNote = custIsExisting
+    ? `<div class="modal-warn">⚠️ Khách này đã có trên SayCar — nên báo khách tự đặt trên APP. Đặt qua đây chỉ được hoa hồng thấp (5%).</div>`
+    : '';
   const ok = await uiConfirm({
     title: 'Xác nhận đặt chuyến',
     html:
@@ -260,6 +283,7 @@ async function doBooking() {
          <div class="leg to"><span class="pin"></span><span>${esc(sel.dropoff.text)}</span></div>
        </div>
        ${totalTxt ? `<div class="modal-total">${esc(totalTxt)}</div>` : ''}
+       ${existingNote}
        <div class="modal-note">Hệ thống sẽ tạo chuyến <b>thật</b> và gán tài xế ngay.</div>`,
     okText: 'Đặt chuyến',
   });
@@ -282,9 +306,11 @@ async function doBooking() {
   if (!r.ok) return msg('b-msg', r.data.error || 'Đặt chuyến thất bại', 'err');
   const s = r.data.saycar || {};
   const drv = s.driverName ? ` · Tài xế: ${s.driverName}` : '';
-  msg('b-msg', `Đặt chuyến thành công!${s.totalAmount ? ' · ' + vnd(s.totalAmount) : ''}${drv}`, 'ok');
+  const note = s.existingCustomer ? ' · Khách sẵn có (hoa hồng 5%)' : '';
+  msg('b-msg', `Đặt chuyến thành công!${s.totalAmount ? ' · ' + vnd(s.totalAmount) : ''}${drv}${note}`, 'ok');
   // reset form
   ['b-pickup', 'b-dropoff', 'b-cname', 'b-cphone'].forEach((i) => ($(i).value = ''));
+  custIsExisting = false; $('cust-warn').classList.add('hidden');
   sel.pickup = { placeId: '', text: '' };
   sel.dropoff = { placeId: '', text: '' };
   invalidatePrice();

@@ -168,7 +168,15 @@ async function findCustomer(phone) {
   const list = (data && data.data) || [];
   if (!list.length) return null;
   const c = list[0];
-  return { userUUID: c.id, name: c.firstName || '', phone: c.phone };
+  return { userUUID: c.id, name: c.firstName || '', phone: c.phone, isGuest: !!c.isGuest };
+}
+
+// Kiểm tra SĐT có phải KHÁCH SẴN CÓ của saycar không (khách thật, không phải guest do app tạo)
+async function checkCustomer(phone) {
+  if (config.saycar.mock) return { existing: String(phone).endsWith('88'), name: '(mock)' };
+  const c = await findCustomer(phone);
+  if (c && c.userUUID && !c.isGuest) return { existing: true, name: c.name };
+  return { existing: false };
 }
 
 // --- Tạo khách "guest" cho khách MỚI (saycar bắt buộc userUUID hợp lệ khi đặt chuyến) ---
@@ -239,6 +247,7 @@ async function createBooking({ fromPlaceId, toPlaceId, vehicle = 'CAR', customer
 
   // Tra khách theo SĐT; nếu là khách MỚI -> tạo hồ sơ guest để có userUUID hợp lệ.
   let customer = await findCustomer(customerPhone);
+  const existingCustomer = !!(customer && customer.userUUID && !customer.isGuest); // khách saycar sẵn có
   if (!customer || !customer.userUUID) {
     customer = await createGuestCustomer(customerName, customerPhone);
     if (!customer || !customer.userUUID) throw new Error('Không tạo được hồ sơ khách trên saycar');
@@ -267,6 +276,7 @@ async function createBooking({ fromPlaceId, toPlaceId, vehicle = 'CAR', customer
       if (resolved) res.shortCode = resolved.shortCode;
     }
   } catch {}
+  if (res && typeof res === 'object') res.existingCustomer = existingCustomer;
   return res;
 }
 
@@ -318,6 +328,7 @@ module.exports = {
   placeDetail,
   preview,
   findCustomer,
+  checkCustomer,
   createGuestCustomer,
   findDriver,
   listDrivers,

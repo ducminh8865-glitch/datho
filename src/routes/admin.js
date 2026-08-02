@@ -10,18 +10,18 @@ const vnd = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) ||
 
 // Tổng hoa hồng phải trả cho từng cộng tác viên (chỉ tính chuyến HOÀN THÀNH, trừ tiền đã CK)
 router.get('/commissions', auth, adminOnly, (req, res) => {
-  const rate = config.commissionPercent / 100;
   const rows = db.prepare(`
     SELECT u.id, u.phone, u.name,
            COUNT(b.id) AS completed,
-           COALESCE(SUM(b.total_amount), 0) AS gross
+           COALESCE(SUM(b.total_amount), 0) AS gross,
+           COALESCE(SUM(b.total_amount * COALESCE(b.commission_pct, ?) / 100), 0) AS commission
     FROM users u
     JOIN bookings b ON b.user_id = u.id
       AND b.saycar_status = 'success'
       AND lower(replace(b.trip_status, '_', '-')) = 'completed'
     GROUP BY u.id
     ORDER BY gross DESC
-  `).all();
+  `).all(config.commissionPercent);
   const paidRows = db.prepare(
     "SELECT user_id, COALESCE(SUM(amount), 0) AS paid FROM withdrawals WHERE status = 'paid' GROUP BY user_id"
   ).all();
@@ -29,7 +29,7 @@ router.get('/commissions', auth, adminOnly, (req, res) => {
   res.json({
     percent: config.commissionPercent,
     rows: rows.map((r) => {
-      const commission = Math.round(r.gross * rate);
+      const commission = Math.round(r.commission);
       const withdrawn = paidMap.get(r.id) || 0;
       return {
         id: r.id, phone: r.phone, name: r.name,

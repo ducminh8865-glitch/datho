@@ -84,6 +84,10 @@ a.plain { color: var(--primary); }
 .btn.hist-cancel { color: var(--danger); border-color: #fecaca; }
 .btn.hist-cancel:hover { background: #fef2f2; }
 
+/* Cảnh báo khách sẵn có trên saycar */
+.cust-warn { margin-top: 10px; padding: 11px 13px; border-radius: 10px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 13px; line-height: 1.5; }
+.modal-warn { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 13px; line-height: 1.5; }
+
 /* Phân trang lịch sử */
 .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 16px; }
 .pager .pg-btn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: var(--primary); font-size: 20px; font-weight: 700; cursor: pointer; line-height: 1; }
