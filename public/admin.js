@@ -206,35 +206,82 @@ const STATUS_VI = {
   blocked: 'Đã khóa',
 };
 
+let USERS = []; // giữ nguyên danh sách đã tải để lọc tại chỗ, khỏi gọi lại máy chủ
+
 async function loadUsers() {
   const r = await api('/admin/users');
   if (!r.ok) { $('users').innerHTML = '<p class="msg show err">Bạn không có quyền quản trị hoặc chưa đăng nhập. <a class="plain" href="/">Đăng nhập lại</a></p>'; return false; }
-  if (!r.data.length) { $('users').innerHTML = '<p class="muted">Chưa có tài khoản.</p>'; return true; }
-  $('users').innerHTML = r.data.map((u) => {
-    const actions = [];
-    if (u.status === 'active' && u.role !== 'admin') actions.push(`<button class="btn secondary sm" onclick="act(${u.id},'block')">Khóa</button>`);
-    if (u.status === 'blocked') actions.push(`<button class="btn sm" onclick="act(${u.id},'unblock')">Mở khóa</button>`);
-    return `<div class="hist-item">
-      <div class="top">
-        <b>${esc(u.phone)} ${u.role === 'admin' ? '⭐' : ''}</b>
-        <span class="pill ${u.status === 'active' ? 'success' : 'failed'}">${STATUS_VI[u.status] || u.status}</span>
-      </div>
-      ${u.name && u.name !== u.phone ? `<div class="sub">${esc(u.name)}</div>` : ''}
-      ${u.referrer_driver_phone
-        ? `<div class="sub">🚗 Tài xế giới thiệu: <b>${esc((u.referrer_driver_name || '').trim())} ${esc(u.referrer_driver_phone)}</b></div>`
-        : (u.invite_code === 'TÀI XẾ SAYCAR'
-          ? `<div class="sub">🚗 <b>Là tài xế SayCar</b></div>`
-          : (u.invite_code ? `<div class="sub">Vào bằng: <b>mã ${esc(u.invite_code)}</b></div>` : ''))}
-      ${actions.length ? `<div style="margin-top:10px;display:flex;gap:8px">${actions.join('')}</div>` : ''}
-    </div>`;
-  }).join('');
+  USERS = r.data;
+  renderUsers();
   return true;
+}
+
+// Lọc theo SĐT / tên / mã mời / tài xế giới thiệu. Ô tìm gõ tới đâu lọc tới đó.
+function renderUsers() {
+  const box = $('users');
+  const count = $('user-count');
+  if (!USERS.length) { box.innerHTML = '<p class="muted">Chưa có tài khoản.</p>'; count.textContent = ''; return; }
+
+  const q = ($('user-search').value || '').trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, ''); // gõ "0988 816 188" vẫn ra
+  const list = !q ? USERS : USERS.filter((u) => {
+    const hay = [u.phone, u.name, u.invite_code, u.referrer_driver_phone, u.referrer_driver_name]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (hay.includes(q)) return true;
+    return !!qDigits && String(u.phone).replace(/\D/g, '').includes(qDigits);
+  });
+
+  count.textContent = q ? `Tìm thấy ${list.length} / ${USERS.length} tài khoản` : `${USERS.length} tài khoản`;
+  box.innerHTML = list.length
+    ? list.map(userCard).join('')
+    : '<p class="muted">Không có tài khoản nào khớp.</p>';
+}
+
+function userCard(u) {
+  const actions = [];
+  if (u.status === 'active' && u.role !== 'admin') actions.push(`<button class="btn secondary sm" onclick="act(${u.id},'block')">Khóa</button>`);
+  if (u.status === 'blocked') actions.push(`<button class="btn sm" onclick="act(${u.id},'unblock')">Mở khóa</button>`);
+  actions.push(`<button class="btn secondary sm" onclick="resetPw(${u.id})">Đặt lại mật khẩu</button>`);
+  return `<div class="hist-item">
+    <div class="top">
+      <b>${esc(u.phone)} ${u.role === 'admin' ? '⭐' : ''}</b>
+      <span class="pill ${u.status === 'active' ? 'success' : 'failed'}">${STATUS_VI[u.status] || u.status}</span>
+    </div>
+    ${u.name && u.name !== u.phone ? `<div class="sub">${esc(u.name)}</div>` : ''}
+    ${u.referrer_driver_phone
+      ? `<div class="sub">🚗 Tài xế giới thiệu: <b>${esc((u.referrer_driver_name || '').trim())} ${esc(u.referrer_driver_phone)}</b></div>`
+      : (u.invite_code === 'TÀI XẾ SAYCAR'
+        ? `<div class="sub">🚗 <b>Là tài xế SayCar</b></div>`
+        : (u.invite_code ? `<div class="sub">Vào bằng: <b>mã ${esc(u.invite_code)}</b></div>` : ''))}
+    ${actions.length ? `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${actions.join('')}</div>` : ''}
+    <div class="sub" id="pw-${u.id}" style="display:none"></div>
+  </div>`;
 }
 
 async function act(id, action) {
   const r = await api('/admin/users/' + id + '/' + action, 'POST');
   if (!r.ok) alert(r.data.error || 'Lỗi');
   loadUsers();
+}
+
+// Cấp lại mật khẩu cho cộng tác viên quên mật khẩu (app không có luồng tự đặt lại).
+async function resetPw(id) {
+  const custom = prompt(
+    'Đặt lại mật khẩu cho tài khoản này.\n' +
+    'Mật khẩu cũ mất hiệu lực ngay, bạn phải gửi mật khẩu mới cho họ.\n\n' +
+    'Nhập mật khẩu mới, hoặc để trống để hệ thống tự sinh:',
+    ''
+  );
+  if (custom === null) return; // bấm Huỷ
+  const r = await api('/admin/users/' + id + '/reset-password', 'POST', { password: custom.trim() });
+  if (!r.ok) return alert((r.data && r.data.error) || 'Không đặt lại được mật khẩu');
+
+  const box = $('pw-' + id);
+  box.innerHTML = 'Mật khẩu mới của <b>' + esc(r.data.phone) + '</b>: ' +
+    '<code class="inv-code" title="Bấm để chép">' + esc(r.data.password) + '</code>' +
+    ' — chỉ hiện 1 lần, hãy gửi ngay cho họ.';
+  box.querySelector('.inv-code').onclick = function () { copyInvite(this, r.data.password); };
+  box.style.display = 'block';
 }
 
 async function loadBookings() {
