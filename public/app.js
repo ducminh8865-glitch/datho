@@ -133,6 +133,17 @@ async function doLogin() {
   await enterApp();
 }
 
+// Quên mật khẩu: app không tự đặt lại được (không có email/SMS), nên chỉ gửi
+// yêu cầu về Telegram admin, admin cấp mật khẩu mới rồi báo lại cho mình.
+async function doForgot() {
+  clearMsg('login-msg');
+  const phone = $('login-phone').value.trim();
+  if (!phone) return msg('login-msg', 'Nhập số điện thoại của bạn vào ô trên, rồi bấm lại "Quên mật khẩu?"');
+  const r = await api('/auth/forgot-password', 'POST', { phone });
+  if (!r.ok) return msg('login-msg', r.data.error || 'Không gửi được yêu cầu, thử lại sau');
+  msg('login-msg', 'Đã báo quản trị viên. Bạn sẽ được cấp mật khẩu mới và nhắn lại sớm nhất.', 'ok');
+}
+
 function setToken(t) { TOKEN = t; localStorage.setItem('token', t); }
 function logout() { TOKEN = ''; localStorage.removeItem('token'); stopHistoryAutoRefresh(); show('login'); }
 

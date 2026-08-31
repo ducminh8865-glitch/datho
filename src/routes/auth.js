@@ -5,7 +5,10 @@ const { auth } = require('../middleware');
 const { hashPassword, verifyPassword, signToken } = require('../auth-utils');
 const saycar = require('../saycar/client');
 const driverSync = require('../driver-sync');
-const { loginLockLeftSec, recordLoginFail, resetLogin } = require('../rate-limit');
+const { ipLimiter, loginLockLeftSec, recordLoginFail, resetLogin, forgotOnCooldown, markForgot } = require('../rate-limit');
+const telegram = require('../telegram');
+
+const nowVN = () => new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 const router = express.Router();
 
@@ -152,6 +155,36 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Lỗi máy chủ' });
   }
 });
+
+// --- Quên mật khẩu ---
+// Cộng tác viên không khai email, cũng không có cổng SMS -> không thể tự đặt lại.
+// Ở đây chỉ báo admin qua Telegram; admin cấp mật khẩu mới trong trang quản trị.
+router.post(
+  '/forgot-password',
+  ipLimiter({ windowMs: 15 * 60 * 1000, max: 5, message: 'Bạn đã gửi quá nhiều yêu cầu. Thử lại sau ít phút.' }),
+  async (req, res) => {
+    const phone = normPhone(req.body.phone);
+    if (!validPhone(phone)) return res.status(400).json({ error: 'Số điện thoại không hợp lệ' });
+
+    // Chỉ báo Telegram khi SĐT có thật và chưa gửi trong 15 phút qua.
+    if (!forgotOnCooldown(phone)) {
+      markForgot(phone);
+      const u = db.prepare('SELECT phone, name, status FROM users WHERE phone = ?').get(phone);
+      if (u) {
+        telegram.send(
+          '🔑 QUÊN MẬT KHẨU\n' +
+          `👤 ${u.name && u.name !== u.phone ? u.name + ' · ' : ''}${u.phone}\n` +
+          (u.status !== 'active' ? `⚠️ Tài khoản đang: ${u.status}\n` : '') +
+          `🕒 ${nowVN()}\n` +
+          '👉 Vào /admin.html → Tài khoản cộng tác viên → tìm SĐT → bấm "Đặt lại mật khẩu".'
+        ).catch(() => {});
+      }
+    }
+
+    // Trả lời giống hệt nhau dù SĐT có đăng ký hay không, để không lộ ai đã có tài khoản.
+    res.json({ ok: true });
+  }
+);
 
 // --- Thông tin tài khoản đang đăng nhập ---
 router.get('/me', auth, (req, res) => {
