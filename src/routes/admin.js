@@ -1,7 +1,10 @@
 const express = require('express');
+const crypto = require('crypto');
 const db = require('../db');
 const config = require('../config');
 const { auth, adminOnly } = require('../middleware');
+const { hashPassword } = require('../auth-utils');
+const { resetLogin } = require('../rate-limit');
 const push = require('../push');
 const driverSync = require('../driver-sync');
 
@@ -186,6 +189,35 @@ router.post('/users/:id/block', auth, adminOnly, (req, res) => {
 router.post('/users/:id/unblock', auth, adminOnly, (req, res) => {
   db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(req.params.id);
   res.json({ ok: true });
+});
+
+// Cộng tác viên đăng nhập bằng SĐT và không khai email -> không có luồng "quên mật khẩu"
+// tự phục vụ. Admin cấp lại mật khẩu tạm rồi gửi cho họ (Zalo/gọi điện).
+const PW_ABC = 'abcdefghijkmnpqrstuvwxyz23456789'; // bỏ i, l, o, 0, 1 cho đỡ đọc nhầm qua điện thoại
+function randomPassword(len = 8) {
+  return Array.from({ length: len }, () => PW_ABC[crypto.randomInt(PW_ABC.length)]).join('');
+}
+
+router.post('/users/:id/reset-password', auth, adminOnly, async (req, res) => {
+  const target = db.prepare('SELECT id, phone, role FROM users WHERE id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+  if (target.role === 'admin' && target.id !== req.user.id) {
+    return res.status(400).json({ error: 'Không thể đặt lại mật khẩu của quản trị viên khác' });
+  }
+
+  // Bỏ trống -> tự sinh mật khẩu tạm
+  let password = String(req.body.password || '').trim();
+  if (password) {
+    if (password.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
+  } else {
+    password = randomPassword();
+  }
+
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(password), target.id);
+  resetLogin(target.phone); // gỡ luôn khoá 15 phút nếu họ vừa gõ sai nhiều lần
+
+  // Trả về đúng 1 lần để admin chuyển cho cộng tác viên; server không lưu bản rõ.
+  res.json({ ok: true, phone: target.phone, password });
 });
 
 // Toàn bộ đơn đặt

@@ -39,4 +39,19 @@ function recordLoginFail(phone) {
 }
 function resetLogin(phone) { failMap.delete(phone); }
 
-module.exports = { ipLimiter, loginLockLeftSec, recordLoginFail, resetLogin };
+// --- Quên mật khẩu: mỗi SĐT chỉ báo về Telegram admin 1 lần / 15 phút ---
+// Áp cho MỌI số, kể cả số chưa đăng ký, để không lộ ai đã có tài khoản.
+const forgotMap = new Map(); // phone -> thời điểm được gửi tiếp
+const FORGOT_MS = 15 * 60 * 1000;
+
+function forgotOnCooldown(phone) {
+  const until = forgotMap.get(phone);
+  return !!(until && Date.now() < until);
+}
+function markForgot(phone) {
+  const now = Date.now();
+  if (forgotMap.size > 5000) for (const [k, v] of forgotMap) if (now > v) forgotMap.delete(k);
+  forgotMap.set(phone, now + FORGOT_MS);
+}
+
+module.exports = { ipLimiter, loginLockLeftSec, recordLoginFail, resetLogin, forgotOnCooldown, markForgot };
